@@ -1,0 +1,680 @@
+---
+title: "pilot0_visualizations"
+output: html_document
+---
+
+```{r}
+#update.packages(ask = FALSE, checkBuilt = TRUE)
+library(GPArotation)
+library(nFactors)
+library(psych)
+library(Rcpp)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(kableExtra)
+library(magrittr)
+library(RColorBrewer)
+library(readxl)
+library(xlsx)
+library(moments)
+library(reshape)
+library(resemble)
+library(likert)
+library(broom)
+library(grid)
+library(patchwork)
+library(kableExtra)
+library(matrixStats)
+library(networkD3)
+library(mice)
+require(sjmisc)
+
+```
+
+# Reading in the Data
+
+Before reading in the data, we will remove row 2 from all excel files, and rows 2 and 3 from the fall 2017 data. For the summer 2018 and fall 2019 data, nothing was modified. We followed the following steps when reading in the data:
+
+From here, we will determine which students did not truly respond to the survey. To do this, variances were calculated across groups and a variance of roughly 0.6 or lower was seen to consistantly contain false responses. Along with this, few students with greater variances showed obvious answering patterns and were removed.
+
+```{r}
+
+group1 <- read_excel("data/confidential/pilot0_group1.xlsx") %>%
+  select(-"...1")
+
+group2 <- read_excel("data/confidential/pilot0_group2.xlsx") %>%
+  select(-"...1")
+
+group1.long <- read_excel("data/confidential/pilot0_group1_long.xlsx") %>%
+  select(-"...1")
+
+group2.long <- read_excel("data/confidential/pilot0_group2_long.xlsx") %>%
+  select(-"...1")
+
+group1.rc <- read_excel("data/confidential/pilot0_group1_rc.xlsx") %>%
+  select(-"...1")
+
+group2.rc <- read_excel("data/confidential/pilot0_group2_rc.xlsx") %>%
+  select(-"...1")
+
+```
+
+```{r}
+
+group1.matrix <- data.matrix(group1) ### Creating numeric matrix to find row variances
+
+group1.var <- rowVars(group1.matrix) %>% ### Creating data frame of row vaiances
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(variance = '.')
+
+group1 <- group1 %>%
+  mutate(variance = group1.var$variance) %>%
+  filter(variance > 0.6) %>%
+  select(-variance)
+
+group1 <- group1[-c(16, 31), ]
+
+### Repeat for group 2, but selecting the unique columns (question)
+
+group2.matrix <- data.matrix(group2) 
+
+group2.var <- rowVars(group2.matrix) %>% 
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(variance = '.')
+
+group2 <- group2 %>%
+  mutate(variance = group2.var$variance) %>%
+  filter(variance > 0.6) %>%
+  select(-variance)
+
+
+### We also need to calculate the sample size for each group sepeately, as we will read in the raw data for EFA, which requires the sample size.
+n1 <- nrow(group1) 
+n2 <- nrow(group2)
+
+```
+
+Now that the data is ready, we will complete some summaries and visualizations of the data to see what we are working with.
+
+# Summaries of Data
+
+We will summarize the data in multiple ways. Each summary has a particular purpose to Exploratory Factor Analysis (EFA) in terms of our argument decisions in the analysis.
+
+## Averages and Standard Deviations
+
+We will make a table for each group with the variables, their means and standard deviations. This will give us an idea of how our data is looking (normality).
+
+### Tables For Each Group
+
+```{r}
+group1.mean <- colMeans(group1) %>% ### Calculating means
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(Mean = '.')
+
+group1.sd <- apply(group1, 2, sd) %>% ### Calculating SDs
+  round(2) %>%
+  as.data.frame %>%
+  dplyr::rename(SD = '.')
+
+group1.names <- c("Beliefs and Stereotypes 1", "Belief and Stereotypes 2", "Belief and Stereotypes 3", "Belief and Stereotypes 4", "Belief and Stereotypes 5", "Belief and Stereotypes 6", "Belief and Stereotypes 7", "Belief and Stereotypes 8", "Belief and Stereotypes 9", "Belief and Stereotypes 10", "Intrinsic Value 1", "Intrinsic Value 2", "Intrinsic Value 3", "Intrinsic Value 4", "Intrinsic Value 5", "Intrinsic Value 6", "Intrinsic Value 7", "Extrinsic Value 1", "Extrinsic Value 2", "Extrinsic Value 3", "Extrinsic Value 4", "Extrinsic Value 5", "Extrinsic Value 6", "Extrinsic Value 7", "Extrinsic Value 8", "Utility Value 1", "Utility Value 2", "Utility Value 3", "Utility Value 4", "Utility Value 5", "Utility Value 6", "Utility Value 7", "Utility Value 8", "Attainment Value 1", "Attainment Value 2", "Attainment Value 3", "Attainment Value 4", "Attainment Value 5", "Attainment Value 6", "Attainment Value 7", "Interest 1", "Interest 2", "Interest 3", "Interest 4", "Interest 5", "Interest 6", "Interest 7", "Interest 8", "Interest 9") %>%
+  as.data.frame() %>% ### Creating a column of names for the varibles
+  dplyr::rename(Variable = '.')
+
+group1.summary <- bind_cols(group1.names, group1.mean, group1.sd) %>%
+  as.data.frame()
+
+kable(group1.summary, caption = "Group One Summaries") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+### Group 2 ###
+
+group2.mean <- colMeans(group2) %>%
+  round(2) %>%
+  as.data.frame() %>%
+dplyr::rename(Mean = '.')
+
+group2.sd <- apply(group2, 2, sd) %>%
+  round(2) %>%
+  as.data.frame %>%
+dplyr::rename(SD = '.')
+
+group2.names <- c("Academic Self Concept 1", "Academic Self Concept 2", "Academic Self Concept 3", "Academic Self Concept 4", "Academic Self Concept 5", "Academic Self Concept 6", "Academic Self Concept 7", "Academic Self Concept 8", "Academic Self Concept 9", "Attainment Value 1", "Attainment Value 2", "Attainment Value 3", "Attainment Value 4", "Attainment Value 5", "Attainment Value 6", "Attainment Value 7", "Statistics Self Concept 1", "Statistics Self Concept 2", "Statistics Self Concept 3", "Statistics Self Concept 4", "Statistics Self Concept 5", "Statistics Self Concept _6", "Statistics Self Concept 7", "Statistics Self Concept 8", "Statistics Self Concept 9", "Difficulty 1", "Difficulty 2", "Difficulty 3", "Difficulty 4", "Difficulty 5", "Difficulty 6", "Difficulty 7", "Expectancy 1", "Expectancy 2", "Expectancy 3", "Expectancy 4", "Expectancy 5", "Expectancy 6", "Expectancy 7", "Expectancy 8", "Expectancy 9", "Expectancy 10", "Expectancy 11", "Cost 1", "Cost 2", "Cost 3", "Cost 4", "Cost 5", "Cost 6", "Cost 7") %>%
+  as.data.frame() %>%
+  dplyr::rename(Variable = '.')
+
+group2.summary <- bind_cols(group2.names, group2.mean, group2.sd) %>%
+  as.data.frame()
+
+kable(group2.summary, caption = "Group Two Summaries") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+## Histogram Grids
+
+We will generate two set of histogram grids for each group. Each grid will contain one histogram for each question given to said group. These grids will give us a quick visualization of the shape of our data (which is important for later EFA decisions).
+
+### Group 1
+
+```{r fig.height = 10, fig.width = 10}
+### Lets make two grids for each group.
+### Each grid will consist of a histrogram for each variable (question) in the group.
+
+### We first have to add the id number or our data
+group1.id <- tibble::rowid_to_column(group1, "index") %>%
+  as.data.frame()
+
+### We have to change our data in order to create the grids with ggplot. We will 'melt' the data, which will put our columns as one column and our responses as another column. (usually, our rows are responses and columns are variables, but not we will have one column with our variable and one column with the responses for each variable)
+group1.long <- melt(group1.id, id.vars="index") %>%
+  select(-index) ### Removing the row with the id 
+
+### Group 1 grid
+ggplot(group1.long, aes(value)) + ### value indicates the value of each response for each variable
+  geom_histogram(bins=7, ) + ### Creating the histograms
+  facet_wrap(~variable) + ### histrogram for each variable
+  scale_x_continuous(name="Group 1") ### Renaming the X-axis so that we can see which grid is for which group
+
+```
+
+### Group 2
+
+```{r fig.height = 10, fig.width = 10}
+### Comments are the same for group 2
+group2.id <- tibble::rowid_to_column(group2, "index") %>%
+  as.data.frame()
+
+group2.long <- melt(group2.id, id.vars="index") %>%
+  select(-index)
+
+### Group 2 grid
+ggplot(group2.long, aes(value)) +
+  geom_histogram(bins=7, ) +
+  facet_wrap(~variable) + 
+  scale_x_continuous(name="Group 2")
+```
+
+## Likert Visualization
+
+Since our data was obtained on a Likert scale, we can do some unique visualizations in R. Below you'll see the response rate for each question in each hypothesized construct. These response rates can give us another way to look at the shape of our data.
+
+### Group 1 Likert Visualizations For All Hypothesized Constructs
+
+**Belief**
+```{r fig.height = 10, fig.width = 10}
+
+### subset group1 and select all columns from belief construct
+### Belief ###
+group1.belief.factor <- group1 %>%
+  select(Belief_1:Belief_10) %>%
+  mutate(Belief_1 = factor(Belief_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>% ### Have to turn each column into a factor with 7 levels in order for likert function to properly work. 
+  mutate(Belief_2 = factor(Belief_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_3 = factor(Belief_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_4 = factor(Belief_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_5 = factor(Belief_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_6 = factor(Belief_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_7 = factor(Belief_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_8 = factor(Belief_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_9 = factor(Belief_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_10 = factor(Belief_10, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( 'Statistics helps makes sense of the world.' = Belief_1, 'Strong math skills are required to succeed in statistics.' = Belief_2, 'There is little use for statistics outside the classroom.' = Belief_3, 'Statistics is all about plugging numbers into formulas.' = Belief_4, 'Statistics can be manipulated to say whatever you want.' = Belief_5, 'Statistics help us solve complex problems in society.' = Belief_6, 'Statistics is broadly applicable in many fields.'  = Belief_7, 'Statistics is a tool for discovering patterns in data.'  = Belief_8, 'Statistics can be used to make peoples lives better.' = Belief_9, "Statistics is intimidating" = Belief_10 ) %>%
+  as.data.frame() ### Must save as a dataframe for likert package.
+
+group1.belief.likert <- likert(group1.belief.factor) ### Saving likert summary of belief construst
+
+plot(group1.belief.likert, ordered = F) + theme(axis.text=element_text(size=12)) ### Printing this out in a likert friendly view
+
+### Everything is consistant with the rest of the constructs for both groups.
+```
+
+**Intrinsic**
+
+```{r fig.height = 10, fig.width = 10}
+### Intrinsic ###
+group1.intrinsic.factor <- group1 %>%
+  select(Intrinsic_1:Intrinsic_7) %>%
+  mutate(Intrinsic_1 = factor(Intrinsic_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_2 = factor(Intrinsic_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_3 = factor(Intrinsic_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_4 = factor(Intrinsic_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_5 = factor(Intrinsic_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_6 = factor(Intrinsic_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_7 = factor(Intrinsic_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I want to learn statistics." = Intrinsic_1, "I want to learn statistics for professional opportunity and/or growth." = Intrinsic_2, "I want to learn statistics to be a better consumer of information." = Intrinsic_3, "I want to understand how statistics are used in everyday life." = Intrinsic_4, "I want to learn statistics so that I can be a competent citizen." = Intrinsic_5, "I want to learn statistics for my personal fulfillment." = Intrinsic_6,"I want to know statistics to make informed choices for myself (e.g. health, politics, etc.)." = Intrinsic_7) %>%
+  as.data.frame()
+
+group1.intrinsic.likert <- likert(group1.intrinsic.factor)
+
+plot(group1.intrinsic.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Extrinsic**
+
+```{r fig.height = 10, fig.width = 10}
+
+### Extrinsic ###
+group1.Extrinsic.factor <- group1 %>%
+  select(Extrinsic_1:Extrinsic_8) %>%
+  mutate(Extrinsic_1 = factor(Extrinsic_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_2 = factor(Extrinsic_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_3 = factor(Extrinsic_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_4 = factor(Extrinsic_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_5 = factor(Extrinsic_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_6 = factor(Extrinsic_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_7 = factor(Extrinsic_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Extrinsic_8 = factor(Extrinsic_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I need to know statistics." = Extrinsic_1, "I need to know statistics because it is required of me." = Extrinsic_2, "I need to know statistics to obtain a degree/certification." = Extrinsic_3, "I need to know statistics to satisfy employers." = Extrinsic_4, "I need to know statistics because it will be expected of me in the future." = Extrinsic_5, "I need to know statistics so that I appear intelligent to my peers." = Extrinsic_6, "I need to know statistics because someone important to me wants me to." = Extrinsic_7, "I need to know statistics because my family wants me to " = Extrinsic_8) %>%
+  as.data.frame()
+
+group1.Extrinsic.likert <- likert(group1.Extrinsic.factor)
+
+plot(group1.Extrinsic.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Utility**
+
+```{r fig.height = 10, fig.width = 10}
+
+### Utility ###
+group1.utility.factor <- group1 %>%
+  select(Utility_1:Utility_8) %>%
+  mutate(Utility_1 = factor(Utility_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_2 = factor(Utility_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_3 = factor(Utility_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_4 = factor(Utility_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_5 = factor(Utility_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_6 = factor(Utility_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_7 = factor(Utility_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_8 = factor(Utility_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I will use statistics in my career." = Utility_1, "Knowing statistics will help me look more appealing to employers." = Utility_2, "I will never use statistics in the future." = Utility_3, "Statistics is helpful for understanding the world around me." = Utility_4, "Statistics is irrelevant for my life." = Utility_5, "Statistics will help me understand news reports." = Utility_6, "I value statistics because it makes me an informed citizen." = Utility_7, "No one in my career field uses statistics." = Utility_8) %>%
+  as.data.frame()
+
+group1.utility.likert <- likert(group1.utility.factor)
+
+plot(group1.utility.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Attainment**
+
+```{r fig.height = 10, fig.width = 10}
+### Attainment ###
+group1.attainment.factor <- group1 %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(Attain_1 = factor(Attain_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_2 = factor(Attain_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_3 = factor(Attain_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_4 = factor(Attain_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_5 = factor(Attain_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_6 = factor(Attain_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_7 = factor(Attain_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I would only learn statistics if it helped me achieve my goals." = Attain_1, "If I could choose, I would never do statistics in the future." = Attain_2, "I do not care if I understand statistics." = Attain_3, "Understanding statistics empowers me." = Attain_4, " If I did poorly in a statistics course, I would be disappointed in myself." = Attain_5, "Doing well in statistics is important to my sense of self." = Attain_6, "If I am unable to interpret statistical results, I feel insecure." = Attain_7) %>%
+  as.data.frame()
+
+group1.attainment.likert <- likert(group1.attainment.factor)
+
+plot(group1.attainment.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Interest**
+
+```{r fig.height = 10, fig.width = 10}
+### Interest ###
+group1.interest.factor <- group1 %>%
+  select(Interest_1:Interest_9) %>%
+  mutate(Interest_1 = factor(Interest_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_2 = factor(Interest_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_3 = factor(Interest_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_4 = factor(Interest_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_5 = factor(Interest_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_6 = factor(Interest_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_7 = factor(Interest_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_8 = factor(Interest_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_9 = factor(Interest_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I find statistics frustrating." = Interest_1, "I am interested in learning more about statistics." = Interest_2, "I find statistics boring." = Interest_3, "Using statistics to solve real-world problems is personally enjoyable." = Interest_4, "Doing statistics is fun for me." = Interest_5, "I am curious about statistics." = Interest_6, "I find little enjoyment in doing statistics." = Interest_7, "I dread statistics." = Interest_8, "I think conversations about statistics are stimulating." = Interest_9) %>%
+  as.data.frame()
+
+group1.interest.likert <- likert(group1.interest.factor)
+
+plot(group1.interest.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+
+```
+
+### Group 2 Likert Visualizations For All Hypothesized Constructs
+
+**Academic Self Concept**
+```{r fig.height = 10, fig.width = 10}
+### Comments are the same for each construct in group 2
+
+### Academic Self Concept ###
+group2.acadsc.factor <- group2 %>%
+  select(AcadSC_1:AcadSC_9) %>%
+  mutate(AcadSC_1 = factor(AcadSC_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_2 = factor(AcadSC_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_3 = factor(AcadSC_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_4 = factor(AcadSC_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_5 = factor(AcadSC_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_6 = factor(AcadSC_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_7 = factor(AcadSC_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_8 = factor(AcadSC_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_9 = factor(AcadSC_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "Doing well in school is important to me." = AcadSC_1, "I am confident that I can master learning difficult concepts." = AcadSC_2, "If I can't solve a problem right away, I will try again." = AcadSC_3, "I enjoy intellectual challenges." = AcadSC_4, "I avoid working on things that are intimidating to me." = AcadSC_5, "I like learning." = AcadSC_6, "When learning becomes difficult, I usually give up." = AcadSC_7, "When I struggle with new material, I feel that I am not learning." = AcadSC_8, "When I fail at something, I immediately give up." = AcadSC_9) %>%
+  as.data.frame()
+
+group2.acadsc.likert <- likert(group2.acadsc.factor)
+
+plot(group2.acadsc.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Attainment**
+
+```{r fig.height = 10, fig.width = 10}
+### Attain ###
+group2.attainment.factor <- group2 %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(Attain_1 = factor(Attain_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_2 = factor(Attain_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_3 = factor(Attain_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_4 = factor(Attain_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_5 = factor(Attain_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_6 = factor(Attain_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_7 = factor(Attain_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I would only learn statistics if it helped me achieve my goals." = Attain_1, "If I could choose, I would never do statistics in the future." = Attain_2, "I do not care if I understand statistics." = Attain_3, "Understanding statistics empowers me." = Attain_4, " If I did poorly in a statistics course, I would be disappointed in myself." = Attain_5, "Doing well in statistics is important to my sense of self." = Attain_6, "If I am unable to interpret statistical results, I feel insecure." = Attain_7) %>%
+  as.data.frame()
+
+group2.attainment.likert <- likert(group2.attainment.factor)
+
+plot(group2.attainment.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Statistics Self Concept**
+
+```{r fig.height = 10, fig.width = 10}
+### Statistics Self Concept ###
+group2.statsc.factor <- group2 %>%
+  select(StatSC_1:StatSC_9) %>%
+  mutate(StatSC_1 = factor(StatSC_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_2 = factor(StatSC_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_3 = factor(StatSC_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_4 = factor(StatSC_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_5 = factor(StatSC_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_6 = factor(StatSC_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_7 = factor(StatSC_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_8 = factor(StatSC_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_9 = factor(StatSC_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I am able to explain statistical results to others." = StatSC_1, "I am good at statistics." = StatSC_2, "If I keep working at it, I know I can solve most statistics problems." = StatSC_3, "I have trouble understanding statistics." = StatSC_4, "I lack the skills to do well in statistics." = StatSC_5, "I have the academic background to do well in statistics." = StatSC_6, "When I see a statistics question, I am unsure of how to begin." = StatSC_7, "I often need guidance to understand statistics." = StatSC_8, "When statistics becomes challenging, I stop trying." = StatSC_9) %>%
+  as.data.frame()
+
+group2.acadsc.likert <- likert(group2.acadsc.factor)
+
+plot(group2.acadsc.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Difficulty**
+
+```{r fig.height = 10, fig.width = 10}
+### Difficulty ###
+group2.difficulty.factor <- group2 %>%
+  select(Difficult_1:Difficult_7) %>%
+  mutate(Difficult_1 = factor(Difficult_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_2 = factor(Difficult_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_3 = factor(Difficult_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_4 = factor(Difficult_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_5 = factor(Difficult_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_6 = factor(Difficult_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_7 = factor(Difficult_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "You must work hard to understand statistics." = Difficult_1, "Interpreting statistical results is straightforward." = Difficult_2, "Statistics is easy." = Difficult_3, "Only smart people can do statistics." = Difficult_4, "Anybody can do statistics." = Difficult_5, "It is challenging to solve a problem that requires using statistics." = Difficult_6, "Learning statistics for the first time is hard." = Difficult_7) %>%
+  as.data.frame()
+
+group2.difficulty.likert <- likert(group2.difficulty.factor)
+
+plot(group2.difficulty.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Expectancy**
+
+```{r fig.height = 10, fig.width = 10}
+### Expectancy Value ###
+group2.expectancy.factor <- group2 %>%
+  select(Expectancy_1:Expectancy_11) %>%
+  mutate(Expectancy_1 = factor(Expectancy_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_2 = factor(Expectancy_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_3 = factor(Expectancy_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_4 = factor(Expectancy_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_5 = factor(Expectancy_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_6 = factor(Expectancy_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_7 = factor(Expectancy_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_8 = factor(Expectancy_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_9 = factor(Expectancy_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_10 = factor(Expectancy_10, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_11 = factor(Expectancy_11, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I struggle to interpret statistical results." = Expectancy_1, "I am able to make decisions that require statistical thinking." = Expectancy_2, "I can complete tasks that require basic statistical skills." = Expectancy_3, "I can interpret graphs when I see them." = Expectancy_4, "I can identify when statistics is misused." = Expectancy_5, "I find it challenging to decide which statistical method to use in a given context." = Expectancy_6, "I can use statistics to make informed decisions about my life." = Expectancy_7, "I am able to determine if data support a given hypothesis." = Expectancy_8, "I am able to describe the variability for a given data set." = Expectancy_9, "I can determine if a study is an experiment or observational." = Expectancy_10, "I struggle to identify biases that exist in a sample." = Expectancy_11) %>%
+  as.data.frame()
+
+group2.expectancy.likert <- likert(group2.expectancy.factor)
+
+plot(group2.expectancy.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+**Cost**
+
+```{r fig.height = 10, fig.width = 10}
+### Cost ###
+group2.cost.factor <- group2 %>%
+  select(Cost_1:Cost_7) %>%
+  mutate(Cost_1 = factor(Cost_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_2 = factor(Cost_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_3 = factor(Cost_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_4 = factor(Cost_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_5 = factor(Cost_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_6 = factor(Cost_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_7 = factor(Cost_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "Learning statistics is a good use of my time." = Cost_1, "Acquiring statistical skills is worth the effort." = Cost_2, "I prioritize other tasks over statistics." = Cost_3, "I have more important things to do than spending time learning statistics." = Cost_4, "Taking statistics will limit my future prospects (for example, lower my GPA)." = Cost_5, "Learning statistics is worth spending money on." = Cost_6, "I avoid working on statistics because it makes me feel bad." = Cost_7) %>%
+  as.data.frame()
+
+group2.cost.likert <- likert(group2.cost.factor)
+
+plot(group2.cost.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+## Histograms of Hypothesized Constructs
+
+Now that we have visualized the individual items in many ways, let us create histograms of our hypothesized constructs. This will gives us a good idea of the shape and spread of our data relative to our hypothesized constructs (although, these are not expected to be perfect now).
+
+*It is important to note that when producing these graphs, we reverse coded negatively worded items as to not miscalculate true averages.*
+
+### Group 1
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+### Group 1 Constructs histrograms
+
+### Belief Construct
+group1.belief <- group1 %>% ### Choosing the group1 data
+  select(Belief_1:Belief_10) %>% ### Selecting the variabels that belong to this construct
+  mutate(means = rowMeans(.)) %>% ### Calculating means for each row (or student in this case) so that we can plot a histogram of the averages in the constructs.
+  select(means) ### Selecting only that column that had the mean values for each row
+
+plot.belief1 <- ggplot(group1.belief, aes(means)) + ### Plotting the means of each respondant
+  geom_histogram(color="black", fill="grey",) + ### creating the histogram
+  scale_x_continuous(name="Belief Construct", limits = c(0, 7)) ### labeling our x-axis
+
+
+### Code is exactly the same for each construct, expect we pull the unique variables for the given constructs. Each graph will have the same formatting as our x-axis values will never change.
+
+#View(round(cor(group1.rc), 2)) ### Correlation matrix of reverse coded items for group 1 to see if correlations remain positive (check SOMAS notes regarding why there are negatives)
+
+group1.rc <- group1 %>% ### Recoding each negatively worded item so averages calculate correctly.
+  mutate(Interest_1 = 8 - Interest_1) %>%
+  mutate(Interest_3 = 8 - Interest_3) %>%
+  mutate(Interest_8 = 8 - Interest_8) %>%
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  mutate(Interest_7 = 8 - Interest_7) %>%
+  mutate(Belief_10 = 8 - Belief_10) %>%
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  mutate(Utility_8 = 8 - Utility_8) %>%
+  mutate(Utility_3 = 8 - Utility_3) %>%
+  mutate(Utility_5 = 8 - Utility_5) %>%
+  mutate(Belief_3 = 8 - Belief_3) %>%
+  mutate(Belief_4 = 8 - Belief_4) %>%
+  mutate(Belief_5 = 8 - Belief_5) %>%
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  mutate(Belief_2 = 8 - Belief_2)
+
+### Intrinsic construct
+group1.intrinsic <- group1.rc %>%
+  select(Intrinsic_1:Intrinsic_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.intrinsic1 <- ggplot(group1.intrinsic, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Intrinsic Construct", limits = c(0, 7))
+
+### Extrinsic construct
+group1.Extrinsic <- group1.rc %>%
+  select(Extrinsic_1:Extrinsic_8) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.Extrinsic1 <- ggplot(group1.Extrinsic, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Extrinsic Construct", limits = c(0, 7))
+
+### Utility Construct
+group1.utility <- group1.rc %>%
+  select(Utility_1:Utility_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.utility1 <- ggplot(group1.utility, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Construct", limits = c(0, 7))
+
+### Attain Construct
+group1.attain <- group1.rc %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.attain1 <- ggplot(group1.attain, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attain Construct", limits = c(0, 7))
+
+### Interest Construct
+group1.interest <- group1.rc %>%
+  select(Interest_1:Interest_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.interest1 <- ggplot(group1.interest, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Interest Construct", limits = c(0, 7))
+
+plot.attain1 + plot.interest1 + plot.Extrinsic1 + plot.intrinsic1 + plot.utility1 + plot.belief1 ### Wraps the histograms together
+
+```
+
+### Group 2
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+
+
+### Group 2 Constructs
+
+### The code is exactly the same as for group1, but now uses group2 data and unique constructs.
+
+#View(round(cor(group2.rc), 2)) ### Correlation matrix for group 2 reverse coded to see if it's all positive
+
+group2.rc <- group2 %>% ### Recoding each negatively worded item so averages calculate correctly.
+  mutate(Difficult_7 = 8 - Difficult_7) %>%
+  mutate(Difficult_1 = 8 - Difficult_1) %>%
+  mutate(StatSC_4 = 8 - StatSC_4) %>%
+  mutate(Difficult_6 = 8 - Difficult_6) %>%
+  mutate(StatSC_8 = 8 - StatSC_8) %>%
+  mutate(StatSC_7 = 8 - StatSC_7) %>%
+  mutate(Expectancy_6 = 8 - Expectancy_6) %>%
+  mutate(Expectancy_1 = 8 - Expectancy_1) %>%
+  mutate(Cost_5 = 8 - Cost_5) %>%
+  mutate(Cost_7 = 8 - Cost_7) %>%
+  mutate(StatSC_5 = 8 - StatSC_5) %>%
+  mutate(Cost_4 = 8 - Cost_4) %>%
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  mutate(Cost_3 = 8 - Cost_3) %>%
+  mutate(AcadSC_9 = 8 - AcadSC_9) %>%
+  mutate(AcadSC_7 = 8 - AcadSC_7) %>%
+  mutate(AcadSC_5 = 8 - AcadSC_5) %>%
+  mutate(StatSC_9 = 8 - StatSC_9) %>%
+  mutate(AcadSC_8 = 8 - AcadSC_8) %>%
+  mutate(Difficult_4 = 8 - Difficult_4) %>%
+  mutate(Expectancy_11 = 8 - Expectancy_11)
+
+### AcadSC construct
+group2.acadSC <- group2.rc %>%
+  select(AcadSC_1:AcadSC_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.acadSC2 <- ggplot(group2.acadSC, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Academic Self Confidence (AcadSC) Construct", limits = c(0, 7))
+
+### Attain construct
+group2.attain <- group2.rc %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.attain2 <- ggplot(group2.attain, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attain Construct", limits = c(0, 7))
+
+### StatSC construct
+group2.statSC <- group2.rc %>%
+  select(StatSC_1:StatSC_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.statSC2 <- ggplot(group2.statSC, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Statistics Self Confidence (StatSC) Construct", limits = c(0, 7))
+
+###Difficulty construct
+group2.difficult <- group2.rc %>%
+  select(Difficult_1:Difficult_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.difficult2 <- ggplot(group2.difficult, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Difficulty Construct", limits = c(0, 7))
+
+### Expectancy Construct
+group2.expectancy <- group2.rc %>%
+  select(Expectancy_1:Expectancy_11) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.expectancy2 <- ggplot(group2.expectancy, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Expectancy Construct", limits = c(0, 7))
+
+### Cost Construct
+group2.cost <- group2.rc %>%
+  select(Cost_1:Cost_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.cost2 <- ggplot(group2.cost, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Cost Construct", limits = c(0, 7))
+
+plot.cost2 + plot.expectancy2 + plot.difficult2 + plot.statSC2 + plot.acadSC2 + plot.attain2
+
+```

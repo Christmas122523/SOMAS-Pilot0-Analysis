@@ -1,0 +1,625 @@
+---
+title: "pilot0_data_cleaning"
+output: html_document
+---
+```{r}
+#update.packages(ask = FALSE, checkBuilt = TRUE)
+library(GPArotation)
+library(nFactors)
+library(psych)
+library(Rcpp)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(kableExtra)
+library(magrittr)
+library(RColorBrewer)
+library(readxl)
+#library(xlsx)
+library(moments)
+library(reshape)
+library(resemble)
+library(likert)
+library(broom)
+library(grid)
+library(patchwork)
+library(kableExtra)
+library(matrixStats)
+library(networkD3)
+library(mice)
+require(sjmisc)
+require(plyr)
+
+```
+
+### Reading in Data
+
+```{r message=FALSE, warning=FALSE}
+### Reading in all separate excel files and adding the term and instructor as a seperate column.
+
+data1 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA17.xlsx") %>% 
+  mutate(term = "FA17") %>% ### Creating a column with the term and year to keep track.
+  mutate(instructor = "none") ### Adding a column with the instructor name in order to keep track
+### Adding in a column for the term and instructor isn't necessarily relevant for this research, although was done as a way to back track to an instructor/term if any issues came up throughout data cleaning/analysis.
+
+### Comments are the same for each block of code.
+
+data2 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP18_Bhowmick.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Bhowmick")
+
+data3 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP18_Bond.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Bond")
+
+data4 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP18_Kerby.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Kerby")
+
+data5 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP18_Whitaker.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Whitaker")
+
+data6 <- read_excel("data/confidential/S-SOMAS_Pilot0_SU18_Kerby.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Kerby")
+
+data7 <- read_excel("data/confidential/S-SOMAS_Pilot0_SU18_Whitaker.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Whitaker") %>%
+  dplyr::rename('Belief 1' = `Group1_Belief 1`, 'Belief 2' = `Group1_Belief 2`, 'Belief 3' = `Group1_Belief 3`, 'Belief 4' = `Group1_Belief 4`, 'Belief 5' = `Group1_Belief 5`, 'Belief 6' = `Group1_Belief 6`, 
+         'Belief 7' = `Group1_Belief 7`, 'Belief8' = `Group1_Belief8`, 'Belief 9' = `Group1_Belief 9`, 'Belief 10' = `Group1_Belief 10`, 'Intrinsic 1' = `Group1_Intrinsic 1`, 
+         'Intrinsic 2' = `Group1_Intrinsic 2`, 'Intrinsic 3' = `Group1_Intrinsic 3`, 'Intrinsic 4' = `Group1_Intrinsic 4`, 'Intrinsic 5' = `Group1_Intrinsic 5`, 
+         'Intrinsic 6' = `Group1_Intrinsic 6`, 'Intrinsic 7' = `Group1_Intrinsic 7`, 'Extrinsic 1' = `Group1_Extrinsic 1`, 'Extrinsic 2' = `Group1_Extrinsic 2`, 
+         'Extrinsic 3' = `Group1_Extrinsic 3`, 'Extrinsic 4' = `Group1_Extrinsic 4`, 'Extrinsic 5' = `Group1_Extrinsic 5`, 'Extrinsic 6' = `Group1_Extrinsic 6`, 
+         'Extrinsic 7' = `Group1_Extrinsic 7`, 'Extrinsic 8' = `Group1_Extrinsic 8`, 'Utility 1' = `Group1_Utility 1`, 'Utility 2' = `Group1_Utility 2`, 'Utility 3' = `Group1_Utility 3`, 
+         'Utility 4' = `Group1_Utility 4`, 'Utility 5' = `Group1_Utility 5`, 'Utility 6' = `Group1_Utility 6`, 'Utility 7' = `Group1_Utility 7`, 'Utility 8' = `Group1_Utility 8`, 
+         'Attain 1...37' = `Group1_Attain 1`, 'Attain 2...38' = `Group1_Attain 2`, 'Attain 3...39' = `Group1_Attain 3`, 'Attain 4...40' = `Group1_Attain 4`, 'Attain 5...41' = `Group1_Attain 5`, 'Attain 6...42' = `Group1_Attain 6`, 'Attain 7...43' = `Group1_Attain 7`, 'Interest 1' = `Group1_Interest 1`, 'Interest  2' = `Group1_Interest  2`, 'Interest  3' =
+         `Group1_Interest  3`, 'Interest  4' = `Group1_Interest  4`, 'Interest  5' = `Group1_Interest  5`, 'Interest  6' = `Group1_Interest  6`, 'Interest  7' = `Group1_Interest  7`,
+         'Interest  8' = `Group1_Interest  8`, 'Interest  9' = `Group1_Interest  9`) %>%
+  dplyr::rename('AcadSC 1' = `Group 2_AcadSC 1`, 'AcadSC 2' = `Group 2_AcadSC 2`, 'AcadSC 3' = `Group 2_AcadSC 3`, 'AcadSC 4' = `Group 2_AcadSC 4`, 'AcadSC 5' = `Group 2_AcadSC 5`, 'AcadSC 6' =  
+                  `Group 2_AcadSC 6`, 'AcadSC 7' = `Group 2_AcadSC 7`, 'AcadSC 8' = `Group 2_AcadSC 8`, 'AcadSC 9' = `Group 2_AcadSC 9`, 'Attain 1...62' = `Group 2_Attain 1`, 'Attain 2...63' = `Group 2_Attain 2`, 'Attain 3...64' = `Group 2_Attain 3`, 'Attain 4...65' = `Group 2_Attain 4`, 'Attain 5...66' = `Group 2_Attain 5`, 'Attain 6...67'= `Group 2_Attain 6`, 'Attain 7...68' = `Group 2_Attain 7`, 'StatSC 1' = `Group 2_StatSC 1`, 'StatSC 2' = `Group 2_StatSC 2`, 'StatSC 3' = `Group 2_StatSC 3`, 'StatSC 4' = `Group 2_StatSC 4`, 'StatSC 5' = `Group 2_StatSC 5`, 'StatSC 6' = `Group 2_StatSC 6`, 
+         'StatSC 7' = `Group 2_StatSC 7`, 'StatSC 8' = `Group 2_StatSC 8`, 'StatSC 9' = `Group 2_StatSC 9`, 'Difficult 1' = `Group 2_Difficult 1`, 'Difficult 2' = `Group 2_Difficult 2`, 
+         'Difficult 3' = `Group 2_Difficult 3`, 'Difficult 4' = `Group 2_Difficult 4`, 'Difficult 5' = `Group 2_Difficult 5`, 'Difficult 6' = `Group 2_Difficult 6`, 
+         'Difficult 7' = `Group 2_Difficult 7`, 'Expectancy 1' = `Group 2_Expectancy 1`, 'Expectancy 2' = `Group 2_Expectancy 2`, 'Expectancy 3' = `Group 2_Expectancy 3`, 
+         'Expectancy 4' = `Group 2_Expectancy 4`, 'Expectancy 5' = `Group 2_Expectancy 5`, 'Expectancy 6' = `Group 2_Expectancy 6`, 'Expectancy 7' = `Group 2_Expectancy 7`, 
+         'Expectancy 8' = `Group 2_Expectancy 8`, 'Expectancy 9' = `Group 2_Expectancy 9`, 'Expectancy 10' = `Group 2_Expectancy 10`, 'Expectancy 11' = `Group 2_Expectancy 11`, 'Cost 1' =
+         `Group 2_Cost 1`, 'Cost 2' = `Group 2_Cost 2`, 'Cost 3' = `Group 2_Cost 3`, 'Cost 4' = `Group 2_Cost 4`, 'Cost 5' = `Group 2_Cost 5`, 'Cost 6' = `Group 2_Cost 6`, 'Cost 7' = `Group 2_Cost 7`)
+
+data8 <- read_excel("data/confidential/S-SOMAS_Pilot0_SU18_Batacki.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Batacki") %>%
+  dplyr::rename('Belief 1' = `Group1_Belief 1`, 'Belief 2' = `Group1_Belief 2`, 'Belief 3' = `Group1_Belief 3`, 'Belief 4' = `Group1_Belief 4`, 'Belief 5' = `Group1_Belief 5`, 'Belief 6' = `Group1_Belief 6`, 
+         'Belief 7' = `Group1_Belief 7`, 'Belief8' = `Group1_Belief8`, 'Belief 9' = `Group1_Belief 9`, 'Belief 10' = `Group1_Belief 10`, 'Intrinsic 1' = `Group1_Intrinsic 1`, 
+         'Intrinsic 2' = `Group1_Intrinsic 2`, 'Intrinsic 3' = `Group1_Intrinsic 3`, 'Intrinsic 4' = `Group1_Intrinsic 4`, 'Intrinsic 5' = `Group1_Intrinsic 5`, 
+         'Intrinsic 6' = `Group1_Intrinsic 6`, 'Intrinsic 7' = `Group1_Intrinsic 7`, 'Extrinsic 1' = `Group1_Extrinsic 1`, 'Extrinsic 2' = `Group1_Extrinsic 2`, 
+         'Extrinsic 3' = `Group1_Extrinsic 3`, 'Extrinsic 4' = `Group1_Extrinsic 4`, 'Extrinsic 5' = `Group1_Extrinsic 5`, 'Extrinsic 6' = `Group1_Extrinsic 6`, 
+         'Extrinsic 7' = `Group1_Extrinsic 7`, 'Extrinsic 8' = `Group1_Extrinsic 8`, 'Utility 1' = `Group1_Utility 1`, 'Utility 2' = `Group1_Utility 2`, 'Utility 3' = `Group1_Utility 3`, 
+         'Utility 4' = `Group1_Utility 4`, 'Utility 5' = `Group1_Utility 5`, 'Utility 6' = `Group1_Utility 6`, 'Utility 7' = `Group1_Utility 7`, 'Utility 8' = `Group1_Utility 8`, 
+         'Attain 1...37' = `Group1_Attain 1`, 'Attain 2...38' = `Group1_Attain 2`, 'Attain 3...39' = `Group1_Attain 3`, 'Attain 4...40' = `Group1_Attain 4`, 'Attain 5...41' = `Group1_Attain 5`, 'Attain 6...42' = `Group1_Attain 6`, 'Attain 7...43' = `Group1_Attain 7`, 'Interest 1' = `Group1_Interest 1`, 'Interest  2' = `Group1_Interest  2`, 'Interest  3' =
+         `Group1_Interest  3`, 'Interest  4' = `Group1_Interest  4`, 'Interest  5' = `Group1_Interest  5`, 'Interest  6' = `Group1_Interest  6`, 'Interest  7' = `Group1_Interest  7`,
+         'Interest  8' = `Group1_Interest  8`, 'Interest  9' = `Group1_Interest  9`) %>%
+  dplyr::rename('AcadSC 1' = `Group 2_AcadSC 1`, 'AcadSC 2' = `Group 2_AcadSC 2`, 'AcadSC 3' = `Group 2_AcadSC 3`, 'AcadSC 4' = `Group 2_AcadSC 4`, 'AcadSC 5' = `Group 2_AcadSC 5`, 'AcadSC 6' =  
+                  `Group 2_AcadSC 6`, 'AcadSC 7' = `Group 2_AcadSC 7`, 'AcadSC 8' = `Group 2_AcadSC 8`, 'AcadSC 9' = `Group 2_AcadSC 9`, 'Attain 1...62' = `Group 2_Attain 1`, 'Attain 2...63' = `Group 2_Attain 2`, 'Attain 3...64' = `Group 2_Attain 3`, 'Attain 4...65' = `Group 2_Attain 4`, 'Attain 5...66' = `Group 2_Attain 5`, 'Attain 6...67'= `Group 2_Attain 6`, 'Attain 7...68' = `Group 2_Attain 7`, 'StatSC 1' = `Group 2_StatSC 1`, 'StatSC 2' = `Group 2_StatSC 2`, 'StatSC 3' = `Group 2_StatSC 3`, 'StatSC 4' = `Group 2_StatSC 4`, 'StatSC 5' = `Group 2_StatSC 5`, 'StatSC 6' = `Group 2_StatSC 6`, 
+         'StatSC 7' = `Group 2_StatSC 7`, 'StatSC 8' = `Group 2_StatSC 8`, 'StatSC 9' = `Group 2_StatSC 9`, 'Difficult 1' = `Group 2_Difficult 1`, 'Difficult 2' = `Group 2_Difficult 2`, 
+         'Difficult 3' = `Group 2_Difficult 3`, 'Difficult 4' = `Group 2_Difficult 4`, 'Difficult 5' = `Group 2_Difficult 5`, 'Difficult 6' = `Group 2_Difficult 6`, 
+         'Difficult 7' = `Group 2_Difficult 7`, 'Expectancy 1' = `Group 2_Expectancy 1`, 'Expectancy 2' = `Group 2_Expectancy 2`, 'Expectancy 3' = `Group 2_Expectancy 3`, 
+         'Expectancy 4' = `Group 2_Expectancy 4`, 'Expectancy 5' = `Group 2_Expectancy 5`, 'Expectancy 6' = `Group 2_Expectancy 6`, 'Expectancy 7' = `Group 2_Expectancy 7`, 
+         'Expectancy 8' = `Group 2_Expectancy 8`, 'Expectancy 9' = `Group 2_Expectancy 9`, 'Expectancy 10' = `Group 2_Expectancy 10`, 'Expectancy 11' = `Group 2_Expectancy 11`, 'Cost 1' =
+         `Group 2_Cost 1`, 'Cost 2' = `Group 2_Cost 2`, 'Cost 3' = `Group 2_Cost 3`, 'Cost 4' = `Group 2_Cost 4`, 'Cost 5' = `Group 2_Cost 5`, 'Cost 6' = `Group 2_Cost 6`, 'Cost 7' = `Group 2_Cost 7`)
+
+data9 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Clothier.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Clothier")
+
+data10 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Fernandio.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Fernandio")
+
+data11 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Hughes.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Hughes")
+
+data12 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Johnson.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Johnson")
+
+data13 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Kerby.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Kerby")
+
+data14 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Kleffner.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Kleffner")
+
+data15 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_McGowan.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "McGowan")
+
+data16 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Rumsey.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Rumsey")
+
+data17 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Sharma.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Sharma")
+
+data18 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Sigdel.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Sigdel")
+
+data19 <- read_excel("data/confidential/S-SOMAS_Pilot0_FA19_Zeinab.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Zeinab")
+
+data20 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP20_Clothier.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Clothier")
+
+data21 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP20_Johnson.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Johnson")
+
+data22 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP20_Kerby.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Kerby")
+
+data23 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP20_Sigdel.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Sigdel")
+
+data24 <- read_excel("data/confidential/S-SOMAS_Pilot0_SP20_Unfried.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Unfried")
+
+data <- data.frame() ### Defining an empty data set in order to allow the actual data sets to join to something
+
+data <- data %>% ### Joining data sets together. The function only allows two data sets to join at once, so piping all the data sets with our main data set will merge them together. The 'full' function merging rows on top of eachother for matchign columns
+    join(data1, type="full") %>%
+    join(data2, type="full") %>%
+    join(data3, type="full") %>%
+    join(data4, type="full") %>%
+    join(data5, type="full") %>%
+    join(data6, type="full") %>%
+    join(data7, type="full") %>%
+    join(data8, type="full") %>%
+    join(data9, type="full") %>%
+    join(data10, type="full") %>%
+    join(data11, type="full") %>%
+    join(data12, type="full") %>%
+    join(data13, type="full") %>%
+    join(data14, type="full") %>%
+    join(data15, type="full") %>%
+    join(data16, type="full") %>%
+    join(data17, type="full") %>%
+    join(data18, type="full") %>%
+    join(data19, type="full") %>%
+    join(data20, type="full") %>%
+    join(data21, type="full") %>%
+    join(data22, type="full") %>%
+    join(data23, type="full") %>%
+    join(data24, type="full") %>%
+    filter(Consent == 1)
+
+#data <- bind_rows(data1, data2, data3, data4, data5, data6, data7, 
+                  #data8, data9, data10, data11, data12, data13, data14, 
+                 # data15, data16, data17, data18, data19, data20, data21, data22, data23, data24, id = NULL) %>% ### Combining all data files together
+ # filter(Consent == 1) ### Removing students who did not consent. This code also removes some NA consent values, which also did not have survey responses. (35 students removed).
+```
+
+### Selecting a subset of the data for group 1
+
+```{r}
+
+group1 <- data %>%
+  select(`Belief 1`:`Interest  9`) %>% ### Selecting columns (questions) group 1 answered (these are our known items predetermined for group 1)
+  mutate(na = rowSums(is.na(.))) %>% ### Determining how many NA values in each row and creating a new column with that value for each row
+  filter(na < 49) %>% ### Removing anyone who did not complete the group 1 survey. They will have 49 missing responses once items are selected.
+  select(-na) %>% ### Remove the column with na value counts for each row as we do not need this column anymore.
+  dplyr::rename(Belief_1 = `Belief 1`, Belief_2 = `Belief 2`, Belief_3 = `Belief 3`, Belief_4 = `Belief 4`, Belief_5 = `Belief 5`, Belief_6 = `Belief 6`, 
+         Belief_7 = `Belief 7`, Belief_8 = `Belief8`, Belief_9 = `Belief 9`, Belief_10 = `Belief 10`, Intrinsic_1 = `Intrinsic 1`, 
+         Intrinsic_2 = `Intrinsic 2`, Intrinsic_3 = `Intrinsic 3`, Intrinsic_4 = `Intrinsic 4`, Intrinsic_5 = `Intrinsic 5`, 
+         Intrinsic_6 = `Intrinsic 6`, Intrinsic_7 = `Intrinsic 7`, Extrinsic_1 = `Extrinsic 1`, Extrinsic_2 = `Extrinsic 2`, 
+         Extrinsic_3 = `Extrinsic 3`, Extrinsic_4 = `Extrinsic 4`, Extrinsic_5 = `Extrinsic 5`, Extrinsic_6 = `Extrinsic 6`, 
+         Extrinsic_7 = `Extrinsic 7`, Extrinsic_8 = `Extrinsic 8`, Utility_1 = `Utility 1`, Utility_2 = `Utility 2`, Utility_3 = `Utility 3`, 
+         Utility_4 = `Utility 4`, Utility_5 = `Utility 5`, Utility_6 = `Utility 6`, Utility_7 = `Utility 7`, Utility_8 = `Utility 8`, 
+         Attain_1 = `Attain 1...37`, Attain_2 = `Attain 2...38`, Attain_3 = `Attain 3...39`, Attain_4 = `Attain 4...40`, Attain_5 = `Attain 5...41`, Attain_6 = `Attain 6...42`, Attain_7 = `Attain 7...43`, Interest_1 = `Interest 1`, Interest_2 = `Interest  2`, Interest_3 =
+         `Interest  3`, Interest_4 = `Interest  4`, Interest_5 = `Interest  5`, Interest_6 = `Interest  6`, Interest_7 = `Interest  7`,
+         Interest_8 = `Interest  8`, Interest_9 = `Interest  9`) ### Changing variable names to include no spaces as this just makes things much easier in analysis and labeling
+
+```
+
+### Imputing missing data
+
+```{r}
+imp <- mice(group1, maxit = 0) ### Imputing the data with no iterations so it can extract the appropriate method of imputing for each variable with missing data.
+predM <- imp$predictorMatrix ### Prediction Matrix. Necessary for the mice() function to work properly.
+meth <- imp$method ### Method of imputation for each variable. This allows for automatic detection of imputation methods.
+
+imp1 <- mice(group1, m = 10, predictorMatrix = predM, method = meth, print = FALSE) ### Imputing the data 10 times in order to obtain 10 different imputed data sets.
+
+
+group1.imputed <- merge_imputations( ### Merging the imputed data with the main data file. Basically, this method selects the most common response from our iterations for the missing data and fills in the missing value with the most common imputed value.
+  group1,
+  imp1,
+  group1) %>% ### This merges the original data and the imputed variables, so we end up with duplicates for any variable that was imputed.
+  select(-c("Belief_1", "Belief_7"  ,  ### We first  can start by removing all of the original variables that had at least one value imputed. We will replace these with the imputed variables
+           "Belief_8"   ,  "Belief_9" ,  "Intrinsic_1","Intrinsic_4" ,
+           "Intrinsic_5" , "Intrinsic_6" , "Extrinsic_1", "Extrinsic_2", 
+           "Extrinsic_5" ,"Extrinsic_7", "Utility_1"  , 
+           "Utility_4"  ,  
+           "Attain_3" ,    "Attain_4" ,"Attain_7" ,    "Interest_1" ,  "Interest_2" , 
+           "Interest_4",   "Interest_5",   "Interest_7" ,  "Interest_8",   "Interest_9")) %>%
+  ### Here we rename our imputed variables to the original variable names that we want.
+  dplyr::rename(Belief_1 = Belief_1_imp, Belief_7 = Belief_7_imp, Belief_8 = Belief_8_imp, Belief_9 = Belief_9_imp, Intrinsic_1 = Intrinsic_1_imp, Intrinsic_4 = Intrinsic_4_imp, Intrinsic_5 = Intrinsic_5_imp, Intrinsic_6 = Intrinsic_6_imp, Extrinsic_1 = Extrinsic_1_imp, Extrinsic_2 = Extrinsic_2_imp, Extrinsic_5 = Extrinsic_5_imp, Extrinsic_7 = Extrinsic_7_imp, Utility_1 = Utility_1_imp, Utility_4 = Utility_4_imp, Attain_3 = Attain_3_imp, Attain_4 = Attain_4_imp, Attain_7 = Attain_7_imp, Interest_1 = Interest_1_imp, Interest_2 = Interest_2_imp, Interest_4 = Interest_4_imp, Interest_5 = Interest_5_imp, Interest_7 = Interest_7_imp, Interest_8 = Interest_8_imp, Interest_9 = Interest_9_imp )
+
+group1.imputed <- group1.imputed[, c("Belief_1",     "Belief_2",     "Belief_3" ,    "Belief_4" ,    "Belief_5",     "Belief_6" ,    "Belief_7"  ,  
+           "Belief_8"   ,  "Belief_9"  ,   "Belief_10"  ,  "Intrinsic_1" , "Intrinsic_2",  "Intrinsic_3"  ,"Intrinsic_4" ,
+           "Intrinsic_5" , "Intrinsic_6" , "Intrinsic_7" , "Extrinsic_1", "Extrinsic_2", "Extrinsic_3", "Extrinsic_4",
+           "Extrinsic_5" ,"Extrinsic_6" ,"Extrinsic_7", "Extrinsic_8" ,"Utility_1"  ,  "Utility_2",    "Utility_3" ,  
+           "Utility_4"  ,  "Utility_5"  ,  "Utility_6" ,   "Utility_7" ,   "Utility_8",    "Attain_1"  ,   "Attain_2",    
+           "Attain_3" ,    "Attain_4" ,    "Attain_5" ,    "Attain_6" ,    "Attain_7" ,    "Interest_1" ,  "Interest_2" , 
+           "Interest_3",   "Interest_4",   "Interest_5",   "Interest_6",   "Interest_7" ,  "Interest_8",   "Interest_9" )] ### Reordering columns so they are in the proper order.
+
+#group1 <- group1 %>% ### Checking to make sure all missing data is gone.
+  #mutate(na = rowSums(is.na(.))) %>%
+  #select(-na) 
+```
+
+### Removing students with low variance
+
+```{r}
+group1.matrix <- data.matrix(group1.imputed) ### Creating numeric matrix to find row variances in order to calculate the variances of students answers prior to reverse coding items. 
+
+group1.var <- rowVars(group1.matrix) %>% ### Creating data frame of row variances
+  round(2) %>% ### Rounding this variance to two decimal places
+  as.data.frame() %>% ### Saving the column as a data frame in order to merge it into the group1 data for filtering
+  dplyr::rename(variance = '.')
+
+group1 <- group1.imputed %>%
+  mutate(variance = group1.var$variance) %>% ### Adding the variance column from group1.var to our main data column. Since the responses are in the same order, this should line up our variances with each row and allow us to remove students who did not have enough variation in their responses. A low variation is indicative of a student not truly engaging with the survey and thus making their responses not representative.
+  filter(variance > 0.6) %>% ### We chose an arbitrary cut off of 0.6 (I don't think there was a reason for this, but might be good to double check). This leads us to removing 37 students for low variation in responses.
+  select(-variance) ### Removing the variance column after we filter since we don't need it anymore.
+
+### Repeat for group 2, but selecting the unique columns (question)
+```
+
+### Comparing imputed data to regular data
+
+```{r}
+#Creating the dataset where we've removed rows with missing data as a comparison to the imputed dataset.
+#group1.inc <- data %>%
+  #select(`Belief 1`:`Interest  9`) %>% ### Selecting columns (questions) group 1 answered (these are our known items predetermined for group 1)
+  #mutate(na = rowSums(is.na(.))) %>% ### Determining how many NA values in each row and creating a new column with that value for each row
+  #filter(na == 0) %>% ### Removing any missing data to simulate our original idea of the data.
+  #select(-na) %>% ### Remove the column with na value counts for each row as we do not need this column anymore.
+  #dplyr::rename(Belief_1 = `Belief 1`, Belief_2 = `Belief 2`, Belief_3 = `Belief 3`, Belief_4 = `Belief 4`, Belief_5 = `Belief 5`, Belief_6 = `Belief 6`, 
+        # Belief_7 = `Belief 7`, Belief_8 = `Belief8`, Belief_9 = `Belief 9`, Belief_10 = `Belief 10`, Intrinsic_1 = `Intrinsic 1`, 
+         #Intrinsic_2 = `Intrinsic 2`, Intrinsic_3 = `Intrinsic 3`, Intrinsic_4 = `Intrinsic 4`, Intrinsic_5 = `Intrinsic 5`, 
+         #Intrinsic_6 = `Intrinsic 6`, Intrinsic_7 = `Intrinsic 7`, Extrinsic_1 = `Extrinsic 1`, Extrinsic_2 = `Extrinsic 2`, 
+         #Extrinsic_3 = `Extrinsic 3`, Extrinsic_4 = `Extrinsic 4`, Extrinsic_5 = `Extrinsic 5`, Extrinsic_6 = `Extrinsic 6`, 
+         #Extrinsic_7 = `Extrinsic 7`, Extrinsic_8 = `Extrinsic 8`, Utility_1 = `Utility 1`, Utility_2 = `Utility 2`, Utility_3 = `Utility 3`, 
+        # Utility_4 = `Utility 4`, Utility_5 = `Utility 5`, Utility_6 = `Utility 6`, Utility_7 = `Utility 7`, Utility_8 = `Utility 8`, 
+         #Attain_1 = `Attain 1...37`, Attain_2 = `Attain 2...38`, Attain_3 = `Attain 3...39`, Attain_4 = `Attain 4...40`, Attain_5 = `Attain 5...41`, Attain_6 = `Attain 6...42`, Attain_7 = `Attain 7...43`, Interest_1 = `Interest 1`, Interest_2 = `Interest  2`, Interest_3 =
+         #`Interest  3`, Interest_4 = `Interest  4`, Interest_5 = `Interest  5`, Interest_6 = `Interest  6`, Interest_7 = `Interest  7`,
+         #Interest_8 = `Interest  8`, Interest_9 = `Interest  9`) ### Changing variable names to include no spaces as this just makes things much easier in analysis and labeling
+
+#group1.matrix.inc <- data.matrix(group1.inc) ### Creating numeric matrix to find row variances in order to calculate the variances of students answers prior to reverse coding items. 
+
+#group1.var.inc <- rowVars(group1.matrix.inc) %>% ### Creating data frame of row variances
+ # round(2) %>% ### Rounding this variance to two decimal places
+#  as.data.frame() %>% ### Saving the column as a data frame in order to merge it into the group1 data for filtering
+ # dplyr::rename(variance = '.')
+
+#group1.inc <- group1.inc %>%
+ # mutate(variance = group1.var.inc$variance) %>% ### Adding the variance column from group1.var to our main data column. Since the responses are in the same order, this should line up our variances with each row and allow us to remove students who did not have enough variation in their responses. A low variation is indicative of a student not truly engaging with the survey and thus making their responses not representative.
+ # filter(variance > 0.6) %>% ### We chose an arbitrary cut off of 0.6 (I don't think there was a reason for this, but might be good to double check). This leads us to removing 37 students for low variation in responses.
+ # select(-variance) ### Removing the variance column after we filter since we don't need it anymore.
+
+#round(colMeans(group1) - colMeans(group1.inc), 3) ### Comparing means of imputed and non imputed
+#round(apply(group1, 2, sd) - apply(group1.inc, 2, sd) , 3) ### Comparing SD of imputed and non imputed
+```
+### Group 2
+
+All reasonings are the same for group 2
+```{r}
+group2 <- data %>%
+  select(`AcadSC 1`:`Cost 7`) %>%
+  mutate(na = rowSums(is.na(.))) %>%
+  filter(na < 27) %>% ### < 27 instead of 50 because two students had a lot of missing data. We want to remove them prior to imputation
+  select(-na) %>% ### 1353 responses removed, although, 1335 were completely missing and 18 were partially missing, meaning the true missing data of group 2 is most likely 18.
+  dplyr::rename(AcadSC_1 = `AcadSC 1`, AcadSC_2 = `AcadSC 2`, AcadSC_3 = `AcadSC 3`, AcadSC_4 = `AcadSC 4`, AcadSC_5 = `AcadSC 5`, AcadSC_6 =  
+                  `AcadSC 6`, AcadSC_7 = `AcadSC 7`, AcadSC_8 = `AcadSC 8`, AcadSC_9 = `AcadSC 9`, Attain_1 = `Attain 1...62`, Attain_2 = `Attain 2...63`, Attain_3 = `Attain 3...64`, Attain_4 = `Attain 4...65`, Attain_5 = `Attain 5...66`, Attain_6 = `Attain 6...67`, Attain_7 = `Attain 7...68`, StatSC_1 = `StatSC 1`, StatSC_2 = `StatSC 2`, StatSC_3 = `StatSC 3`, StatSC_4 = `StatSC 4`, StatSC_5 = `StatSC 5`, StatSC_6 = `StatSC 6`, 
+         StatSC_7 = `StatSC 7`, StatSC_8 = `StatSC 8`, StatSC_9 = `StatSC 9`, Difficult_1 = `Difficult 1`, Difficult_2 = `Difficult 2`, 
+         Difficult_3 = `Difficult 3`, Difficult_4 = `Difficult 4`, Difficult_5 = `Difficult 5`, Difficult_6 = `Difficult 6`, 
+         Difficult_7 = `Difficult 7`, Expectancy_1 = `Expectancy 1`, Expectancy_2 = `Expectancy 2`, Expectancy_3 = `Expectancy 3`, 
+         Expectancy_4 = `Expectancy 4`, Expectancy_5 = `Expectancy 5`, Expectancy_6 = `Expectancy 6`, Expectancy_7 = `Expectancy 7`, 
+         Expectancy_8 = `Expectancy 8`, Expectancy_9 = `Expectancy 9`, Expectancy_10 = `Expectancy 10`, Expectancy_11 = `Expectancy 11`, Cost_1 =
+         `Cost 1`, Cost_2 = `Cost 2`, Cost_3 = `Cost 3`, Cost_4 = `Cost 4`, Cost_5 = `Cost 5`, Cost_6 = `Cost 6`, Cost_7 = `Cost 7`) 
+
+
+```
+
+
+```{r}
+
+imp <- mice(group2, maxit = 0)
+
+predM2 <- imp$predictorMatrix ### Prediction Matrix
+meth2 <- imp$method ### Method of imputation for each variable
+
+imp2 <- mice(group2, m = 10, predictorMatrix = predM2, method = meth2, print = FALSE)
+
+group2.imputed <- merge_imputations(
+  group2,
+  imp2,
+  group2) %>%
+  select(-c( "AcadSC_3",      "AcadSC_4"   ,"AcadSC_6" ,     "AcadSC_7"  ,   
+"AcadSC_8"  ,    "AcadSC_9" ,     "Attain_1"  ,    "Attain_2" ,     "Attain_3" ,    
+"Attain_6"  ,  "StatSC_2"    ,  "StatSC_4"     , "StatSC_5" ,    
+"StatSC_6"  ,    "StatSC_8"   ,   "StatSC_9"   ,   "Difficult_1"  , "Difficult_2" , 
+"Difficult_4" ,  "Expectancy_1" ,  "Expectancy_6", "Expectancy_8" , "Expectancy_10",
+"Expectancy_11" ,     "Cost_2", )) %>%
+  dplyr::rename(AcadSC_3 = AcadSC_3_imp, AcadSC_4 = AcadSC_4_imp, AcadSC_6 = AcadSC_6_imp, AcadSC_7 = AcadSC_7_imp, AcadSC_8 = AcadSC_8_imp, AcadSC_9 = AcadSC_9_imp, Attain_1 = Attain_1_imp, Attain_2 = Attain_2_imp, Attain_3 = Attain_3_imp, Attain_6 = Attain_6_imp, StatSC_2 = StatSC_2_imp, StatSC_4 = StatSC_4_imp, StatSC_5 = StatSC_5_imp, StatSC_6 = StatSC_6_imp, StatSC_8 = StatSC_8_imp, StatSC_9 = StatSC_9_imp, Difficult_1 = Difficult_1_imp, Difficult_2 = Difficult_2_imp, Difficult_4 = Difficult_4_imp, Expectancy_1 = Expectancy_1_imp, Expectancy_6 = Expectancy_6_imp, Expectancy_8 = Expectancy_8_imp, Expectancy_10 = Expectancy_10_imp, Expectancy_11 = Expectancy_11_imp, Cost_2 = Cost_2_imp)
+
+
+#names(group1.imputed)
+#names(group2)
+
+
+
+group2.imputed <- group2.imputed[, c("AcadSC_1",      "AcadSC_2",      "AcadSC_3",      "AcadSC_4",      "AcadSC_5",      "AcadSC_6",      "AcadSC_7",     "AcadSC_8",      "AcadSC_9",      "Attain_1",      "Attain_2",      "Attain_3",      "Attain_4",      "Attain_5",     "Attain_6",      "Attain_7",      "StatSC_1",      "StatSC_2",      "StatSC_3",      "StatSC_4",      "StatSC_5",     "StatSC_6",      "StatSC_7",      "StatSC_8",      "StatSC_9",      "Difficult_1",   "Difficult_2",   "Difficult_3",  "Difficult_4",   "Difficult_5",   "Difficult_6",   "Difficult_7",   "Expectancy_1",  "Expectancy_2",  "Expectancy_3", "Expectancy_4",  "Expectancy_5",  "Expectancy_6",  "Expectancy_7",  "Expectancy_8",  "Expectancy_9",  "Expectancy_10", "Expectancy_11", "Cost_1",        "Cost_2",        "Cost_3",        "Cost_4",        "Cost_5",        "Cost_6",       "Cost_7")]
+
+#group2.imputed <- group2.imputed %>% ### Selecting columns (questions) group 1 answered (these are our known items predetermined for group 1)
+  #mutate(na = rowSums(is.na(.))) %>%
+  #select(-na)
+```
+
+
+```{r}
+group2.matrix <- data.matrix(group2.imputed) 
+
+group2.var <- rowVars(group2.matrix) %>% 
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(variance = '.')
+
+group2 <- group2.imputed %>%
+  mutate(variance = group2.var$variance) %>%
+  filter(variance > 0.6) %>% ### 28 students removed for low variance in answers
+  select(-variance)
+
+```
+
+```{r}
+#group2.inc <- data %>%
+  #select(`AcadSC 1`:`Cost 7`) %>%
+  #mutate(na = rowSums(is.na(.))) %>%
+  #filter(na < 45) %>%
+  #select(-na) %>% ### 1353 responses removed, although, 1335 were completely missing and 18 were partially missing, meaning the true missing data of group 2 is most likely 18.
+  #dplyr::rename(AcadSC_1 = `AcadSC 1`, AcadSC_2 = `AcadSC 2`, AcadSC_3 = `AcadSC 3`, AcadSC_4 = `AcadSC 4`, AcadSC_5 = `AcadSC 5`, AcadSC_6 =  
+   #               `AcadSC 6`, AcadSC_7 = `AcadSC 7`, AcadSC_8 = `AcadSC 8`, AcadSC_9 = `AcadSC 9`, Attain_1 = `Attain 1...62`, Attain_2 = `Attain 2...63`, Attain_3 = `Attain 3...64`, Attain_4 = `Attain 4...65`, Attain_5 = `Attain 5...66`, Attain_6 = `Attain 6...67`, Attain_7 = `Attain 7...68`, StatSC_1 = `StatSC 1`, StatSC_2 = `StatSC 2`, StatSC_3 = `StatSC 3`, StatSC_4 = `StatSC 4`, StatSC_5 = `StatSC 5`, StatSC_6 = `StatSC 6`, 
+    #     StatSC_7 = `StatSC 7`, StatSC_8 = `StatSC 8`, StatSC_9 = `StatSC 9`, Difficult_1 = `Difficult 1`, Difficult_2 = `Difficult 2`, 
+     #    Difficult_3 = `Difficult 3`, Difficult_4 = `Difficult 4`, Difficult_5 = `Difficult 5`, Difficult_6 = `Difficult 6`, 
+      #   Difficult_7 = `Difficult 7`, Expectancy_1 = `Expectancy 1`, Expectancy_2 = `Expectancy 2`, Expectancy_3 = `Expectancy 3`, 
+       #  Expectancy_4 = `Expectancy 4`, Expectancy_5 = `Expectancy 5`, Expectancy_6 = `Expectancy 6`, Expectancy_7 = `Expectancy 7`, 
+        # Expectancy_8 = `Expectancy 8`, Expectancy_9 = `Expectancy 9`, Expectancy_10 = `Expectancy 10`, Expectancy_11 = `Expectancy 11`, Cost_1 =
+         #`Cost 1`, Cost_2 = `Cost 2`, Cost_3 = `Cost 3`, Cost_4 = `Cost 4`, Cost_5 = `Cost 5`, Cost_6 = `Cost 6`, Cost_7 = `Cost 7`)
+
+#group2.matrix.inc <- data.matrix(group2.inc) 
+
+#group2.var.inc <- rowVars(group2.matrix.inc) %>% 
+ # round(2) %>%
+  #as.data.frame() %>%
+  #dplyr::rename(variance = '.')
+
+#group2.inc <- group2.inc %>%
+#  mutate(variance = group2.var.inc$variance) %>%
+ # filter(variance > 0.6) %>% ### 28 students removed for low variance in answers
+  #select(-variance)
+
+#round(colMeans(group2) - colMeans(group2.inc), 3)
+#round(apply(group2, 2, sd) - apply(group2.inc, 2, sd) , 3)
+```
+
+
+# SAVING DATA AS .CSV FILE
+
+
+```{r}
+#non-reverse-coded files. Can use for EFA if uncomment and download. 
+
+#write.csv(group1, file = "data/confidential/pilot0_group1.csv", row.names = FALSE) ### Saving group 1 as an excel file
+#write.csv(group2, file = "data/confidential/pilot0_group2.csv", row.names = FALSE) ### Saving group 2 as an excel file
+
+```
+
+
+
+```{r}
+### Long data is particularly useful for generating multi-grid visualizations of many numeric values. Since each of our groups contains many numeric values in which we could create a histogram for each for some quick inference and investigation, we decided to create a long form of this data.
+
+### We first have to add the id number or our data. Without this, the melt() function does not work properly, so you must create identities for each row in your data set. This is simply an index column from 1 to n for n rows.
+group1.id <- tibble::rowid_to_column(group1, "index") %>%
+  as.data.frame()
+
+### We have to change our data in order to create the grids with ggplot. We will 'melt' the data, which will put our columns as one column and our responses as another column. (usually, our rows are responses and columns are variables, but not we will have one column with our variable and one column with the responses for each variable)
+group1.long <- melt(group1.id, id.vars="index") %>%
+  select(-index) ### Removing the row with the id as we are not interested in visualizing this variable.
+
+group2.id <- tibble::rowid_to_column(group2, "index") %>%
+  as.data.frame()
+
+group2.long <- melt(group2.id, id.vars="index") %>%
+  select(-index)
+
+#long version files. Uncomment if you need the data to run visualizations.rmd file
+#write.csv(group1.long, file = "data/confidential/pilot0_group1_long.csv", row.names = FALSE)
+
+#write.csv(group2.long, file = "data/confidential/pilot0_group2_long.csv", row.names = FALSE)
+```
+
+```{r}
+
+group1.rc <- group1 %>% ### Recoding each negatively worded item so averages calculate correctly. Reverse coded items are also used in Dougs CFA, although we do not reverse code for our EFA as the negative loadings are meaningful in context. We did not want to reverse code prior to visualizing or filtering our data since our variances would be impacted through reverse coding and interpretation of responses would be impacted if we reverse coded an item. 
+  mutate(Interest_1 = 8 - Interest_1) %>% ### 8 - item_score gives us the reverse coded version of the item.
+  dplyr::rename('Interest_1rc' = 'Interest_1') %>% ### We redefine the reverse coded item with a unique symbol 'rc' in order to keep track of reverse and non-reverse coded items. In addition, doing this first before defining the non-reverse coded item, 'nrc', ensures that the reverse coded item ends up in the same column location as the original item. 
+  mutate(Interest_1nrc = 8 - Interest_1rc) %>% ### We created an additional column with the non-reverse coded responses and threw it at the end of the data frame as a way to keep track of the responses and have a completed data set for Doug's package.
+  
+  mutate(Interest_3 = 8 - Interest_3) %>%
+  dplyr::rename('Interest_3rc' = 'Interest_3') %>%
+  mutate(Interest_3nrc = 8 - Interest_3rc) %>%
+  
+  mutate(Interest_8 = 8 - Interest_8) %>%
+  dplyr::rename('Interest_8rc' = 'Interest_8') %>%
+  mutate(Interest_8nrc = 8 - Interest_8rc) %>%
+  
+  mutate(Interest_7 = 8 - Interest_7) %>%
+  dplyr::rename('Interest_7rc' = 'Interest_7') %>%
+  mutate(Interest_7nrc = 8 - Interest_7rc) %>%
+  
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  dplyr::rename('Attain_2rc' = 'Attain_2') %>%
+  mutate(Attain_2nrc = 8 - Attain_2rc) %>%
+  
+  mutate(Belief_10 = 8 - Belief_10) %>%
+  dplyr::rename('Belief_10rc' = 'Belief_10') %>%
+  mutate(Belief_10nrc = 8 - Belief_10rc) %>%
+  
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  dplyr::rename('Attain_1rc' = 'Attain_1') %>%
+  mutate(Attain_1nrc = 8 - Attain_1rc) %>%
+  
+  mutate(Utility_8 = 8 - Utility_8) %>%
+  dplyr::rename('Utility_8rc' = 'Utility_8') %>%
+  mutate(Utility_8nrc = 8 - Utility_8rc) %>%
+  
+  mutate(Utility_3 = 8 - Utility_3) %>%
+  dplyr::rename('Utility_3rc' = 'Utility_3') %>%
+  mutate(Utility_3nrc = 8 - Utility_3rc) %>%
+  
+  mutate(Utility_5 = 8 - Utility_5) %>%
+  dplyr::rename('Utility_5rc' = 'Utility_5') %>%
+  mutate(Utility_5nrc = 8 - Utility_5rc) %>%
+  
+  mutate(Belief_3 = 8 - Belief_3) %>%
+  dplyr::rename('Belief_3rc' = 'Belief_3') %>%
+  mutate(Belief_3nrc = 8 - Belief_3rc) %>%
+  
+  mutate(Belief_4 = 8 - Belief_4) %>%
+  dplyr::rename('Belief_4rc' = 'Belief_4') %>%
+  mutate(Belief_4nrc = 8 - Belief_4rc) %>%
+  
+  mutate(Belief_5 = 8 - Belief_5) %>%
+  dplyr::rename('Belief_5rc' = 'Belief_5') %>%
+  mutate(Belief_5nrc = 8 - Belief_5rc) %>%
+  
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  dplyr::rename('Attain_3rc' = 'Attain_3') %>%
+  mutate(Attain_3nrc = 8 - Attain_3rc) %>%
+  
+  mutate(Belief_2 = 8 - Belief_2) %>% 
+  dplyr::rename('Belief_2rc' = 'Belief_2') %>%
+  mutate(Belief_2nrc = 8 - Belief_2rc) 
+
+### Same steps and reasoning for group 2
+
+group2.rc <- group2 %>%
+  mutate(Difficult_7 = 8 - Difficult_7) %>%
+  dplyr::rename('Difficult_7rc' = 'Difficult_7') %>%
+  mutate(Difficult_7nrc = 8 - Difficult_7rc) %>%
+  
+  mutate(Difficult_1 = 8 - Difficult_1) %>%
+  dplyr::rename('Difficult_1rc' = 'Difficult_1') %>%
+  mutate(Difficult_1nrc = 8 - Difficult_1rc) %>%
+  
+  mutate(StatSC_4 = 8 - StatSC_4) %>%
+  dplyr::rename('StatSC_4rc' = 'StatSC_4') %>%
+  mutate(StatSC_4nrc = 8 - StatSC_4rc) %>%
+  
+  mutate(Difficult_6 = 8 - Difficult_6) %>%
+  dplyr::rename('Difficult_6rc' = 'Difficult_6') %>%
+  mutate(Difficult_6nrc = 8 - Difficult_6rc) %>%
+  
+  mutate(StatSC_8 = 8 - StatSC_8) %>%
+  dplyr::rename('StatSC_8rc' = 'StatSC_8') %>%
+  mutate(StatSC_8nrc = 8 - StatSC_8rc) %>%
+  
+  mutate(StatSC_7 = 8 - StatSC_7) %>%
+  dplyr::rename('StatSC_7rc' = 'StatSC_7') %>%
+  mutate(StatSC_7nrc = 8 - StatSC_7rc) %>%
+  
+  mutate(Expectancy_6 = 8 - Expectancy_6) %>%
+  dplyr::rename('Expectancy_6rc' = 'Expectancy_6') %>%
+  mutate(Expectancy_6nrc = 8 - Expectancy_6rc) %>%
+  
+  mutate(Expectancy_1 = 8 - Expectancy_1) %>%
+  dplyr::rename('Expectancy_1rc' = 'Expectancy_1') %>%
+  mutate(Expectancy_1nrc = 8 - Expectancy_1rc) %>%
+  
+  mutate(Cost_7 = 8 - Cost_7) %>%
+  dplyr::rename('Cost_7rc' = 'Cost_7') %>%
+  mutate(Cost_7nrc = 8 - Cost_7rc) %>%
+  
+  mutate(StatSC_5 = 8 - StatSC_5) %>%
+  dplyr::rename('StatSC_5rc' = 'StatSC_5') %>%
+  mutate(StatSC_5nrc = 8 - StatSC_5rc) %>%
+  
+  mutate(Cost_5 = 8 - Cost_5) %>%
+  dplyr::rename('Cost_5rc' = 'Cost_5') %>%
+  mutate(Cost_5nrc = 8 - Cost_5rc) %>%
+  
+  mutate(Cost_4 = 8 - Cost_4) %>%
+  dplyr::rename('Cost_4rc' = 'Cost_4') %>%
+  mutate(Cost_4nrc = 8 - Cost_4rc) %>%
+  
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  dplyr::rename('Attain_2rc' = 'Attain_2') %>%
+  mutate(Attain_2nrc = 8 - Attain_2rc) %>%
+  
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  dplyr::rename('Attain_3rc' = 'Attain_3') %>%
+  mutate(Attain_3nrc = 8 - Attain_3rc) %>%
+  
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  dplyr::rename('Attain_1rc' = 'Attain_1') %>%
+  mutate(Attain_1nrc = 8 - Attain_1rc) %>%
+  
+  mutate(Cost_3 = 8 - Cost_3) %>%
+  dplyr::rename('Cost_3rc' = 'Cost_3') %>%
+  mutate(Cost_3nrc = 8 - Cost_3rc) %>%
+  
+  mutate(AcadSC_9 = 8 - AcadSC_9) %>%
+  dplyr::rename('AcadSC_9rc' = 'AcadSC_9') %>%
+  mutate(AcadSC_9nrc = 8 - AcadSC_9rc) %>%
+  
+  mutate(AcadSC_7 = 8 - AcadSC_7) %>%
+  dplyr::rename('AcadSC_7rc' = 'AcadSC_7') %>%
+  mutate(AcadSC_7nrc = 8 - AcadSC_7rc) %>%
+  
+  mutate(AcadSC_5 = 8 - AcadSC_5) %>%
+  dplyr::rename('AcadSC_5rc' = 'AcadSC_5') %>%
+  mutate(AcadSC_5nrc = 8 - AcadSC_5rc) %>%
+  
+  mutate(StatSC_9 = 8 - StatSC_9) %>%
+  dplyr::rename('StatSC_9rc' = 'StatSC_9') %>%
+  mutate(StatSC_9nrc = 8 - StatSC_9rc) %>%
+  
+  mutate(AcadSC_8 = 8 - AcadSC_8) %>%
+  dplyr::rename('AcadSC_8rc' = 'AcadSC_8') %>%
+  mutate(AcadSC_8nrc = 8 - AcadSC_8rc) %>%
+  
+  mutate(Difficult_4 = 8 - Difficult_4) %>%
+  dplyr::rename('Difficult_4rc' = 'Difficult_4') %>%
+  mutate(Difficult_4nrc = 8 - Difficult_4rc) %>%
+  
+  mutate(Expectancy_11 = 8 - Expectancy_11) %>%
+  dplyr::rename('Expectancy_11rc' = 'Expectancy_11') %>%
+  mutate(Expectancy_11nrc = 8 - Expectancy_11rc)
+
+#write.csv(group1.rc, file = "data/confidential/group1rc.csv", row.names = FALSE)
+#write.csv(group2.rc, file = "data/confidential/group2rc.csv", row.names = FALSE)
+
+```

@@ -1,0 +1,322 @@
+---
+title: "S-SOMAS Pilot-0 CFA"
+author: "Douglas Whitaker"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+## CFA
+
+This draws on Matt's code for reading the data and the like. 
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+
+```
+
+```{r setup, include=FALSE}
+## Loading packages that are needed for the following code
+
+#rm(list = ls(all.names = TRUE)) ### Used to test if code works from beginning without having to knit
+
+library("readxl") # read_excel
+library("dplyr") # mutate
+library("matrixStats") # rowVars
+library("psych") # skew, kurtosi
+library("lavaan") # cfa
+library("semPlot") 
+library("corrplot")
+library("eRm")
+library("semTools")
+library("ltm")
+library("kableExtra")
+
+# library(GPArotation)
+# library(nFactors)
+# library(ggplot2)
+# library(tidyverse)
+# library(kableExtra)
+# library(magrittr)
+# library(RColorBrewer)
+# library(moments)
+# library(reshape)
+# library(resemble)
+# library(likert)
+# library(broom)
+# library(grid)
+# library(patchwork)
+# library(kableExtra)
+# library(networkD3)
+
+```
+
+# Reading in the Data
+
+We read in the datasets created using the `pilot0_data_cleaning.Rmd` file. 
+
+```{r readdata}
+group1 <- read.csv(file = "data/confidential/group1rc.csv")
+group2 <- read.csv(file = "data/confidential/group2rc.csv")
+
+```
+
+
+We now drop the "nrc" columns because we won't use them.
+
+```{r dropnrc}
+group1 <- group1[,!grepl("nrc", names(group1))]
+group2 <- group2[,!grepl("nrc", names(group2))]
+```
+
+Now we'll do some basic checking of normality assumptions. We expect the data to not follow a normal distribution, but the hope is that it does not deviate too terribly from normality as to compromise the subsequent analyses.
+
+```{r normality1}
+max(abs(psych::skew(group1)))
+max(abs(psych::kurtosi(group1)))
+max(abs(psych::skew(group2)))
+max(abs(psych::kurtosi(group2)))
+# kurtosi is not a typo
+```
+
+According to Kline (2005), "absolute skew greater than 3 and kurtosis greater than 10 are problematic." Only a single item is problematic: AcadSC_1 (ASC1; "44- Doing well in school is important to me."). This item was noted as being problematic for several reasons:
+- It seems to be measuring Attainment Value, not Academic Self-Concept (based on alignment to construct definitions).
+- Even if it were an Attainment Value item, it is quite general.
+- In the Summer 2020 EFA, it loaded in the empirical Attainment Value construct.
+- There is a substantial ceiling effect. 
+
+With those noted problems, we will exclude this item from the subsequent analyses. Otherwise, despite the obvious non-normality of the data from each item, we will proceed with the CFA. 
+
+```{r}
+group2 <- group2[,-1] # Exclude AcadSC_1
+```
+
+# Confirmatory Factor Analysis
+
+## CFA Reminders
+
+Note: This section copies and builds on Alana's prose and code.
+
+Ideal metrics:
+
+* CFI >= 0.95
+* RMSEA <= 0.05, upper 90$ CI <= 0.10
+* SRMR <= 0.08
+
+Since all variables being assessed are ordinal, we tell R to use weighted least squares instead of maximum likelihood estimation by using the option `ordered=names()` in the `cfa()` statement. This also defaults to using polychoric correlations. For fit parameters, use the ''robust'' estimates as justified by the `lavaan` package authors. This method uses ''diagonally weighted least squares (DWLS) for estimation, and a scaled-shifted test statistic (SS).'' Other books refer to this as robust diagonally weighted least squares.(Can cite Brown CFA book, or R books as reference here.)
+
+## List of Models
+
+ Name | Group | Factors | Description  
+ --- | --- | ---
+Model 1.1 | Group 1 | 6 | All items aligned to nominal constructs 
+<!--Model 1.2 | Group 1 | 5 | Retained items aligned to constructs after EFA review 
+Model 1.3 | Group 1 | 5 | Model 1.2 but dropping Extrinsic_2 from UtilityCareer
+Model 1.4 | Group 1 | 5+1 | Model 1.3 but creating a HOF for Utility
+Model 1.5 | Group 1 | 5+1+1 | Model 1.4 but creating a HOF for Values-->
+Model 2.1 | Group 2 | 6 | All items aligned to nominal constructs 
+<!--Model 2.2 | Group 2 | 5 | Retained items aligned to constructs after EFA review -->
+
+
+
+## Model 1.1
+
+```{r cfa11}
+cfamodel1.1 <- ' #latent variable definitions
+Belief =~ Belief_1 + Belief_2rc + Belief_3rc + Belief_4rc + Belief_5rc + Belief_6 + Belief_7 + Belief_8 + Belief_9 + Belief_10rc 
+Intrinsic =~ Intrinsic_1 + Intrinsic_2 + Intrinsic_3 + Intrinsic_4 + Intrinsic_5 + Intrinsic_6 + Intrinsic_7
+Extrinsic =~ Extrinsic_1 + Extrinsic_2 + Extrinsic_3 + Extrinsic_4 + Extrinsic_5 + Extrinsic_6 + Extrinsic_7 + Extrinsic_8 
+Utility =~ Utility_1 + Utility_2 + Utility_3rc + Utility_4 + Utility_5rc + Utility_6 + Utility_7 + Utility_8rc 
+Attainment =~ Attain_1rc + Attain_2rc + Attain_3rc + Attain_4 + Attain_5 + Attain_6 + Attain_7    
+Interest =~ Interest_1rc + Interest_2 + Interest_3rc + Interest_4 + Interest_5 + Interest_6 + Interest_7rc + Interest_8rc + Interest_9  
+              '
+fit1.1 <- cfa(cfamodel1.1, data = group1, ordered = names(group1))
+print(fitMeasures(fit1.1, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit1.1, what = "est")
+```
+
+```{r cfa11more}
+semTools::reliability(fit1.1)
+print(fitMeasures(fit1.1, c("chisq.scaled", "df.scaled", "cfi.scaled", "tli.scaled", "srmr", "rmsea.scaled", "rmsea.ci.upper.scaled")))
+
+```
+
+
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit1.1)
+write.csv(fitted(fit1.1)$cov, file = "out/fit1.1-cov.csv")
+corrplot(fitted(fit1.1)$cov)
+
+```
+
+<!--
+## Model 1.2
+
+```{r cfa12}
+cfamodel1.2 <- ' #latent variable definitions
+Extrinsic =~ Extrinsic_6 + Extrinsic_7 + Extrinsic_8 
+UtilityCareer =~ Utility_1 + Utility_2 + Utility_3rc + Utility_8rc + Extrinsic_2 + Extrinsic_4 + Extrinsic_5
+UtilityPersonal =~ Utility_4 + Utility_5rc + Utility_6 + Utility_7 + Intrinsic_3 + Intrinsic_7
+Attainment =~ Attain_5 + Attain_6 + Attain_7    
+Interest =~ Interest_1rc + Interest_2 + Interest_3rc + Interest_4 + Interest_5 + Interest_7rc + Interest_8rc + Interest_9 + Attain_2rc
+
+              '
+fit1.2 <- cfa(cfamodel1.2, data = group1, ordered = names(group1))
+print(fitMeasures(fit1.2, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit1.2, what = "est")
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit1.2)
+write.csv(fitted(fit1.2)$cov, file = "out/fit1.2-cov.csv")
+corrplot(fitted(fit1.2)$cov)
+
+```
+
+## Model 1.3
+
+Noting the large p-value and the observed lack of correlation with other items, we remove Extrinsic_2 (E2, "46- I need to know statistics because it is required of me.")
+
+```{r cfa13}
+cfamodel1.3 <- ' #latent variable definitions
+Extrinsic =~ Extrinsic_6 + Extrinsic_7 + Extrinsic_8 
+UtilityCareer =~ Utility_1 + Utility_2 + Utility_3rc + Utility_8rc + Extrinsic_4 + Extrinsic_5
+UtilityPersonal =~ Utility_4 + Utility_5rc + Utility_6 + Utility_7 + Intrinsic_3 + Intrinsic_7
+Attainment =~ Attain_5 + Attain_6 + Attain_7    
+Interest =~ Interest_1rc + Interest_2 + Interest_3rc + Interest_4 + Interest_5 + Interest_7rc + Interest_8rc + Interest_9 + Attain_2rc
+
+              '
+fit1.3 <- cfa(cfamodel1.3, data = group1, ordered = names(group1))
+print(fitMeasures(fit1.3, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit1.3, what = "est")
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit1.3)
+write.csv(fitted(fit1.3)$cov, file = "out/fit1.3-cov.csv")
+corrplot(fitted(fit1.3)$cov)
+
+```
+
+
+## Model 1.4
+
+Noting the strong correlations among different utility value items, we introduce a higher-order factor (Utility) that is supported by theory.
+
+```{r cfa14}
+cfamodel1.4 <- ' #latent variable definitions
+Extrinsic =~ Extrinsic_6 + Extrinsic_7 + Extrinsic_8 
+UtilityCareer =~ Utility_1 + Utility_2 + Utility_3rc + Utility_8rc + Extrinsic_4 + Extrinsic_5
+UtilityPersonal =~ Utility_4 + Utility_5rc + Utility_6 + Utility_7 + Intrinsic_3 + Intrinsic_7
+Attainment =~ Attain_5 + Attain_6 + Attain_7    
+Interest =~ Interest_1rc + Interest_2 + Interest_3rc + Interest_4 + Interest_5 + Interest_7rc + Interest_8rc + Interest_9 + Attain_2rc
+Utility =~ UtilityCareer + UtilityPersonal
+              '
+fit1.4 <- cfa(cfamodel1.4, data = group1, ordered = names(group1))
+print(fitMeasures(fit1.4, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit1.4, what = "est")
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit1.4)
+write.csv(fitted(fit1.4)$cov, file = "out/fit1.4-cov.csv")
+corrplot(fitted(fit1.4)$cov)
+
+```
+
+## Model 1.5
+
+We introduce further higher-order factors for Values based on theory.
+
+```{r cfa15}
+cfamodel1.5 <- ' #latent variable definitions
+Extrinsic =~ Extrinsic_6 + Extrinsic_7 + Extrinsic_8 
+UtilityCareer =~ Utility_1 + Utility_2 + Utility_3rc + Utility_8rc + Extrinsic_4 + Extrinsic_5
+UtilityPersonal =~ Utility_4 + Utility_5rc + Utility_6 + Utility_7 + Intrinsic_3 + Intrinsic_7
+Attainment =~ Attain_5 + Attain_6 + Attain_7    
+Interest =~ Interest_1rc + Interest_2 + Interest_3rc + Interest_4 + Interest_5 + Interest_7rc + Interest_8rc + Interest_9 + Attain_2rc
+Utility =~ UtilityCareer + UtilityPersonal
+Values =~ Utility + Interest + Attainment
+              '
+fit1.5 <- cfa(cfamodel1.5, data = group1, ordered = names(group1))
+print(fitMeasures(fit1.5, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit1.5, what = "est")
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit1.5)
+write.csv(fitted(fit1.5)$cov, file = "out/fit1.5-cov.csv")
+corrplot(fitted(fit1.5)$cov)
+
+```
+
+-->
+
+## Model 2.1
+
+```{r cfa21}
+cfamodel2.1 <- ' #latent variable definitions
+                AcadSC =~ AcadSC_2 + AcadSC_3 + AcadSC_4 + AcadSC_5rc + AcadSC_6 + AcadSC_7rc + AcadSC_8rc + AcadSC_9rc
+StatSC =~ StatSC_1 + StatSC_2 + StatSC_3 + StatSC_4rc + StatSC_5rc + StatSC_6 + StatSC_7rc + StatSC_8rc + StatSC_9rc
+Attainmenet =~ Attain_1rc + Attain_2rc + Attain_3rc + Attain_4 + Attain_5 + Attain_6 + Attain_7
+Difficulty =~ Difficult_1rc + Difficult_2 + Difficult_3 + Difficult_4rc + Difficult_5 + Difficult_6rc + Difficult_7rc
+Expectancy =~ Expectancy_1rc + Expectancy_2 + Expectancy_3 + Expectancy_4 + Expectancy_5 + Expectancy_6rc + Expectancy_7 + Expectancy_8 + Expectancy_9 + Expectancy_10 + Expectancy_11rc 
+Cost =~ Cost_1 + Cost_2 + Cost_3rc + Cost_4rc + Cost_5rc + Cost_6 + Cost_7rc
+              '
+fit2.1 <- cfa(cfamodel2.1, data = group2, ordered = names(group2))
+print(fitMeasures(fit2.1, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit2.1, what = "est")
+```
+
+```{r cfa21more}
+semTools::reliability(fit2.1)
+print(fitMeasures(fit2.1, c("chisq.scaled", "df.scaled", "cfi.scaled", "tli.scaled", "srmr", "rmsea.scaled", "rmsea.ci.upper.scaled")))
+
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit2.1)
+write.csv(fitted(fit2.1)$cov, file = "out/fit2.1-cov.csv")
+corrplot(fitted(fit2.1)$cov)
+
+```
+
+<!--## Model 2.2
+
+```{r cfa22}
+cfamodel2.2 <- ' #latent variable definitions
+                AcadSC =~ AcadSC_3 + AcadSC_5rc + AcadSC_7rc + AcadSC_9rc + StatSC_9rc
+Attainmenet =~ Attain_5 + Attain_6 + Attain_7
+Difficulty =~ Difficult_1rc + Difficult_2 + Difficult_3 + Difficult_6rc + Difficult_7rc + Expectancy_1rc + Cost_7rc
+Expectancy =~ + Expectancy_2 + Expectancy_3 + Expectancy_4 + Expectancy_5 + Expectancy_8 + Expectancy_9 + Expectancy_10 + AcadSC_2 + StatSC_1 + StatSC_6
+Cost =~ Cost_1 + Cost_2 + Cost_3rc + Cost_4rc + Cost_6 + Attain_4
+              '
+fit2.2 <- cfa(cfamodel2.2, data = group2, ordered = names(group2))
+print(fitMeasures(fit2.2, c("cfi.scaled", "tli.scaled", "rmsea.scaled", "rmsea.ci.upper.scaled", "srmr")))
+semPaths(fit2.2, what = "est") 
+```
+
+Now we need to identify local misfit by examining the covariance matrix. We'll write it to a CSV and examine it manually.
+
+```{r}
+parameterEstimates(fit2.2)
+write.csv(fitted(fit2.2)$cov, file = "out/fit2.2-cov.csv")
+corrplot(fitted(fit2.2)$cov)
+
+```
+-->
+
+

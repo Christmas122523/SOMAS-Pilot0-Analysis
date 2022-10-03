@@ -1,0 +1,1789 @@
+---
+title: "Final S-SOMAS Analysis"
+author: "Matt Dunham (minor updates by Douglas Whitaker)"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document:
+    number_sections: true
+---
+
+# What Does Our Data Consist Of?
+
+Editing to learn about conflicts; kept both edits manually. Our data consists of responses from college students enrolling in introductory Statistics classes. The data is on a 7-point likert scale. The students were randomly assigned to take either survey one or survey two, which both consisted of 49 to 50 items. The students were randomly split into two groups due to the length of the survey. The data files range from Fall 2017 to Fall 2019. The data files range from Fall 2017 to Fall 2019. The data files are in the `data/confidential` folder. 
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+
+```
+
+```{r setup, include=FALSE}
+## Loading packages that are needed for the following code
+
+#rm(list = ls(all.names = TRUE)) ### Used to test if code works from beginning without having to knit
+
+library(GPArotation)
+library(nFactors)
+library(psych)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(kableExtra)
+library(magrittr)
+library(RColorBrewer)
+library(readxl)
+library(moments)
+library(reshape)
+library(resemble)
+library(likert)
+library(broom)
+library(grid)
+library(patchwork)
+library(kableExtra)
+library(matrixStats)
+library(networkD3)
+
+```
+
+# Reading in the Data
+
+Before reading in the data, we will remove row 2 from all excel files, and rows 2 and 3 from the fall 2017 data. For the summer 2018 and fall 2019 data, nothing was modified. We followed the following steps when reading in the data:
+
+* We first will read in all the data individually from each professor and term/year.
+
+```{r message=FALSE, warning=FALSE}
+### Reading in all seperate excel files and adding the term and instructor as a seperate column.
+
+data1 <- read_excel("data/S-SOMAS_Pilot0_FA17.xlsx") %>% 
+  mutate(term = "FA17") %>% ### Creating a column with the term and year to keep track
+  mutate(instructor = "none") ### Adding a column with the instructor name in order to keep track
+
+### Comments are the same for each block of code.
+
+data2 <- read_excel("data/S-SOMAS_Pilot0_SP18_Bhowmick.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Bhowmick")
+
+data3 <- read_excel("data/S-SOMAS_Pilot0_SP18_Bond.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Bond")
+
+data4 <- read_excel("data/S-SOMAS_Pilot0_SP18_Kerby.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Kerby")
+
+data5 <- read_excel("data/S-SOMAS_Pilot0_SP18_Whitaker.xlsx") %>%
+  mutate(term = "SP18") %>%
+  mutate(instructor = "Whitaker")
+
+data6 <- read_excel("data/S-SOMAS_Pilot0_SU18_Kerby.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Kerby")
+
+data7 <- read_excel("data/S-SOMAS_Pilot0_SU18_Whitaker.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Whitaker")
+
+data8 <- read_excel("data/S-SOMAS_Pilot0_SU18_Batacki.xlsx") %>%
+  mutate(term = "SU18") %>%
+  mutate(instructor = "Batacki")
+
+data9 <- read_excel("data/S-SOMAS_Pilot0_FA19_Clothier.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Clothier")
+
+data10 <- read_excel("data/S-SOMAS_Pilot0_FA19_Fernandio.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Fernandio")
+
+data11 <- read_excel("data/S-SOMAS_Pilot0_FA19_Hughes.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Hughes")
+
+data12 <- read_excel("data/S-SOMAS_Pilot0_FA19_Johnson.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Johnson")
+
+data13 <- read_excel("data/S-SOMAS_Pilot0_FA19_Kerby.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Kerby")
+
+data14 <- read_excel("data/S-SOMAS_Pilot0_FA19_Kleffner.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Kleffner")
+
+data15 <- read_excel("data/S-SOMAS_Pilot0_FA19_McGowan.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "McGowan")
+
+data16 <- read_excel("data/S-SOMAS_Pilot0_FA19_Rumsey.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Rumsey")
+
+data17 <- read_excel("data/S-SOMAS_Pilot0_FA19_Sharma.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Sharma")
+
+data18 <- read_excel("data/S-SOMAS_Pilot0_FA19_Sigdel.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Sigdel")
+
+data19 <- read_excel("data/S-SOMAS_Pilot0_FA19_Zeinab.xlsx") %>%
+  mutate(term = "FA19") %>%
+  mutate(instructor = "Zeinab")
+
+data20 <- read_excel("data/S-SOMAS_Pilot0_SP20_Clothier.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Clothier")
+
+data21 <- read_excel("data/S-SOMAS_Pilot0_SP20_Johnson.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Johnson")
+
+data22 <- read_excel("data/S-SOMAS_Pilot0_SP20_Kerby.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Kerby")
+
+data23 <- read_excel("data/S-SOMAS_Pilot0_SP20_Sigdel.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Sigdel")
+
+data24 <- read_excel("data/S-SOMAS_Pilot0_SP20_Unfried.xlsx") %>%
+  mutate(term = "SP20") %>%
+  mutate(instructor = "Unfried")
+```
+
+* We will combine all of our data and remove any students who did not consent to having their responses used.
+
+```{r}
+
+### All rows stacked ontop of eachother (all columns must be the same)
+data <- bind_rows(data1, data2, data3, data4, data5, data6, data7, 
+                  data8, data9, data10, data11, data12, data13, data14, 
+                  data15, data16, data17, data18, data19, data20, data21, data22, data23, data24, id = NULL) ### Since all columns are the same for each data set, we will combine all the data together into one big data set with the bind_rows command.
+
+n.old <- nrow(data) ### Original sample size
+
+
+```
+
+* Let us then separate the data into group 1 and 2.
+
+From here, we will determine which students did not truly respond to the survey. To do this, variances were calculated across groups and a variance of roughly 0.6 or lower was seen to consistantly contain false responses. Along with this, few students with greater variances showed obvious answering patterns and were removed.
+
+```{r}
+
+### We remove those who did not consent as we are not able to use their responses in the analysis.
+
+data <- data %>%
+  filter(Consent == 1) ### Selecting only those who consented. This command specifically selects all responses (including columns and rows) of those who have a 1 in the Consent column. This 1 corrseponds with "I consent"
+
+
+### Since the survey was split into two parts, students did not answer all questions in the entire survey. For the analysis, we want to split the data into these two groups and then perform EFA seperatly for each group.
+
+group1 <- data %>%
+  select(`Belief 1`:`Interest  9`) %>% ### Selecting columns (questions) group 1 answered
+  mutate(na = rowSums(is.na(.))) %>% ### Determining how many NA values in each row and creating a new column with that value for each row
+  filter(na == 0) %>% ### Removing any row with any NA values (potentially change this?)
+  select(-na) %>% ### Remove the column with na values
+  dplyr::rename(Belief_1 = `Belief 1`, Belief_2 = `Belief 2`, Belief_3 = `Belief 3`, Belief_4 = `Belief 4`, Belief_5 = `Belief 5`, Belief_6 = `Belief 6`, 
+         Belief_7 = `Belief 7`, Belief_8 = `Belief8`, Belief_9 = `Belief 9`, Belief_10 = `Belief 10`, Intrinsic_1 = `Intrinsic 1`, 
+         Intrinsic_2 = `Intrinsic 2`, Intrinsic_3 = `Intrinsic 3`, Intrinsic_4 = `Intrinsic 4`, Intrinsic_5 = `Intrinsic 5`, 
+         Intrinsic_6 = `Intrinsic 6`, Intrinsic_7 = `Intrinsic 7`, Exstrinsic_1 = `Extrinsic 1`, Exstrinsic_2 = `Extrinsic 2`, 
+         Exstrinsic_3 = `Extrinsic 3`, Exstrinsic_4 = `Extrinsic 4`, Exstrinsic_5 = `Extrinsic 5`, Exstrinsic_6 = `Extrinsic 6`, 
+         Exstrinsic_7 = `Extrinsic 7`, Exstrinsic_8 = `Extrinsic 8`, Utility_1 = `Utility 1`, Utility_2 = `Utility 2`, Utility_3 = `Utility 3`, 
+         Utility_4 = `Utility 4`, Utility_5 = `Utility 5`, Utility_6 = `Utility 6`, Utility_7 = `Utility 7`, Utility_8 = `Utility 8`, 
+         Attain_1 = `Attain 1...37`, Attain_2 = `Attain 2...38`, Attain_3 = `Attain 3...39`, Attain_4 = `Attain 4...40`, Attain_5 = `Attain 5...41`, Attain_6 = `Attain 6...42`, Attain_7 = `Attain 7...43`, Interest_1 = `Interest 1`, Interest_2 = `Interest  2`, Interest_3 =
+         `Interest  3`, Interest_4 = `Interest  4`, Interest_5 = `Interest  5`, Interest_6 = `Interest  6`, Interest_7 = `Interest  7`,
+         Interest_8 = `Interest  8`, Interest_9 = `Interest  9`) ### Changing variable names to include no spaces as this just makes things much easier.
+
+group1.matrix <- data.matrix(group1) ### Creating numeric matrix to find row variances
+
+group1.var <- rowVars(group1.matrix) %>% ### Creating data frame of row vaiances
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(variance = '.')
+
+group1 <- group1 %>%
+  mutate(variance = group1.var$variance) %>%
+  filter(variance > 0.6) %>%
+  select(-variance)
+
+group1 <- group1[-c(16, 31), ]
+
+### Repeat for group 2, but selecting the unique columns (question)
+
+group2 <- data %>%
+  select(`AcadSC 1`:`Cost 7`) %>%
+  mutate(na = rowSums(is.na(.))) %>%
+  filter(na == 0) %>%
+  select(-na) %>%
+  dplyr::rename(AcadSC_1 = `AcadSC 1`, AcadSC_2 = `AcadSC 2`, AcadSC_3 = `AcadSC 3`, AcadSC_4 = `AcadSC 4`, AcadSC_5 = `AcadSC 5`, AcadSC_6 =  
+                  `AcadSC 6`, AcadSC_7 = `AcadSC 7`, AcadSC_8 = `AcadSC 8`, AcadSC_9 = `AcadSC 9`, Attain_1 = `Attain 1...62`, Attain_2 = `Attain 2...63`, Attain_3 = `Attain 3...64`, Attain_4 = `Attain 4...65`, Attain_5 = `Attain 5...66`, Attain_6 = `Attain 6...67`, Attain_7 = `Attain 7...68`, StatSC_1 = `StatSC 1`, StatSC_2 = `StatSC 2`, StatSC_3 = `StatSC 3`, StatSC_4 = `StatSC 4`, StatSC_5 = `StatSC 5`, StatSC_6 = `StatSC 6`, 
+         StatSC_7 = `StatSC 7`, StatSC_8 = `StatSC 8`, StatSC_9 = `StatSC 9`, Difficult_1 = `Difficult 1`, Difficult_2 = `Difficult 2`, 
+         Difficult_3 = `Difficult 3`, Difficult_4 = `Difficult 4`, Difficult_5 = `Difficult 5`, Difficult_6 = `Difficult 6`, 
+         Difficult_7 = `Difficult 7`, Expectancy_1 = `Expectancy 1`, Expectancy_2 = `Expectancy 2`, Expectancy_3 = `Expectancy 3`, 
+         Expectancy_4 = `Expectancy 4`, Expectancy_5 = `Expectancy 5`, Expectancy_6 = `Expectancy 6`, Expectancy_7 = `Expectancy 7`, 
+         Expectancy_8 = `Expectancy 8`, Expectancy_9 = `Expectancy 9`, Expectancy_10 = `Expectancy 10`, Expectancy_11 = `Expectancy 11`, Cost_1 =
+         `Cost 1`, Cost_2 = `Cost 2`, Cost_3 = `Cost 3`, Cost_4 = `Cost 4`, Cost_5 = `Cost 5`, Cost_6 = `Cost 6`, Cost_7 = `Cost 7`)
+
+group2.matrix <- data.matrix(group2) 
+
+group2.var <- rowVars(group2.matrix) %>% 
+  round(2) %>%
+  as.data.frame() %>%
+  dplyr::rename(variance = '.')
+
+group2 <- group2 %>%
+  mutate(variance = group2.var$variance) %>%
+  filter(variance > 0.6) %>%
+  select(-variance)
+
+
+### We also need to calculate the sample size for each group sepeately, as we will read in the raw data for EFA, which requires the sample size.
+n1 <- nrow(group1) 
+n2 <- nrow(group2)
+```
+
+Now that the data is ready, we will complete some summaries and visualizations of the data to see what we are working with.
+
+# Summaries of Data
+
+We will summarize the data in multiple ways. Each summary has a particular purpose to Exploratory Factor Analysis (EFA) in terms of our argument decisions in the analysis.
+
+## Sample Sizes
+
+We start off with **`r n.old`** total observations when we initially read in all our data. After removing those who did not consent, we obtained a total sample size of **2381**, with group 1 having **1194** students and group 2 having **1187** students. **67** students were removed due to lack of variation in responses.
+
+## Averages and Standard Deviations
+
+We will make a table for each group with the variables, their means and standard deviations. This will give us an idea of how our data is looking (normality).
+
+### Tables For Each Group
+
+```{r}
+group1.mean <- colMeans(group1) %>% ### Calculating means
+  round(2) %>%
+  as.data.frame()
+
+group1.sd <- apply(group1, 2, sd) %>% ### Calculating SDs
+  round(2) %>%
+  as.data.frame
+
+group1.names <- c("Beliefs and Stereotypes 1", "Belief and Stereotypes 2", "Belief and Stereotypes 3", "Belief and Stereotypes 4", "Belief and Stereotypes 5", "Belief and Stereotypes 6", "Belief and Stereotypes 7", "Belief and Stereotypes 8", "Belief and Stereotypes 9", "Belief and Stereotypes 10", "Intrinsic Value 1", "Intrinsic Value 2", "Intrinsic Value 3", "Intrinsic Value 4", "Intrinsic Value 5", "Intrinsic Value 6", "Intrinsic Value 7", "Extrinsic Value 1", "Extrinsic Value 2", "Extrinsic Value 3", "Extrinsic Value 4", "Extrinsic Value 5", "Extrinsic Value 6", "Extrinsic Value 7", "Extrinsic Value 8", "Utility Value 1", "Utility Value 2", "Utility Value 3", "Utility Value 4", "Utility Value 5", "Utility Value 6", "Utility Value 7", "Utility Value 8", "Attainment Value 1", "Attainment Value 2", "Attainment Value 3", "Attainment Value 4", "Attainment Value 5", "Attainment Value 6", "Attainment Value 7", "Interest 1", "Interest 2", "Interest 3", "Interest 4", "Interest 5", "Interest 6", "Interest 7", "Interest 8", "Interest 9") %>%
+  as.data.frame() ### Creating a column of names for the varibles
+
+group1.summary <- bind_cols(group1.names, group1.mean, group1.sd) %>%
+  dplyr::rename(Variable = '....1', Mean = '....2', SD = '....3') %>%
+  as.data.frame()
+
+kable(group1.summary, caption = "Group One Summaries") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+### Group 2 ###
+
+group2.mean <- colMeans(group2) %>%
+  round(2) %>%
+  as.data.frame()
+
+group2.sd <- apply(group2, 2, sd) %>%
+  round(2) %>%
+  as.data.frame
+
+group2.names <- c("Academic Self Concept 1", "Academic Self Concept 2", "Academic Self Concept 3", "Academic Self Concept 4", "Academic Self Concept 5", "Academic Self Concept 6", "Academic Self Concept 7", "Academic Self Concept 8", "Academic Self Concept 9", "Attainment Value 1", "Attainment Value 2", "Attainment Value 3", "Attainment Value 4", "Attainment Value 5", "Attainment Value 6", "Attainment Value 7", "Statistics Self Concept 1", "Statistics Self Concept 2", "Statistics Self Concept 3", "Statistics Self Concept 4", "Statistics Self Concept 5", "Statistics Self Concept _6", "Statistics Self Concept 7", "Statistics Self Concept 8", "Statistics Self Concept 9", "Difficulty 1", "Difficulty 2", "Difficulty 3", "Difficulty 4", "Difficulty 5", "Difficulty 6", "Difficulty 7", "Expectancy 1", "Expectancy 2", "Expectancy 3", "Expectancy 4", "Expectancy 5", "Expectancy 6", "Expectancy 7", "Expectancy 8", "Expectancy 9", "Expectancy 10", "Expectancy 11", "Cost 1", "Cost 2", "Cost 3", "Cost 4", "Cost 5", "Cost 6", "Cost 7") %>%
+  as.data.frame()
+
+group2.summary <- bind_cols(group2.names, group2.mean, group2.sd) %>%
+  dplyr::rename(Variable = '....1', Mean = '....2', SD = '....3') %>%
+  as.data.frame()
+
+kable(group2.summary, caption = "Group Two Summaries") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+## Histogram Grids
+
+We will generate two set of histogram grids for each group. Each grid will contain one histogram for each question given to said group. These grids will give us a quick visualization of the shape of our data (which is important for later EFA decisions).
+
+### Group 1
+
+```{r fig.height = 10, fig.width = 10}
+### Lets make two grids for each group.
+### Each grid will consist of a histrogram for each variable (question) in the group.
+
+### We first have to add the id number or our data
+group1.id <- tibble::rowid_to_column(group1, "index") %>%
+  as.data.frame()
+
+### We have to change our data in order to create the grids with ggplot. We will 'melt' the data, which will put our columns as one column and our responses as another column. (usually, our rows are responses and columns are variables, but not we will have one column with our variable and one column with the responses for each variable)
+group1.long <- melt(group1.id, id.vars="index") %>%
+  select(-index) ### Removing the row with the id 
+
+### Group 1 grid
+ggplot(group1.long, aes(value)) + ### value indicates the value of each response for each variable
+  geom_histogram(bins=7, ) + ### Creating the histograms
+  facet_wrap(~variable) + ### histrogram for each variable
+  scale_x_continuous(name="Group 1") ### Renaming the X-axis so that we can see which grid is for which group
+
+```
+
+### Group 2
+
+```{r fig.height = 10, fig.width = 10}
+### Comments are the same for group 2
+group2.id <- tibble::rowid_to_column(group2, "index") %>%
+  as.data.frame()
+
+group2.long <- melt(group2.id, id.vars="index") %>%
+  select(-index)
+
+### Group 2 grid
+ggplot(group2.long, aes(value)) +
+  geom_histogram(bins=7, ) +
+  facet_wrap(~variable) + 
+  scale_x_continuous(name="Group 2")
+```
+
+## Likert Visualization
+
+Since our data was obtained on a Likert scale, we can do some unique visualizations in R. Below you'll see the response rate for each question in each hypothesized construct. These response rates can give us another way to look at the shape of our data.
+
+### Group 1 Likert Visualizations For All Hypothesized Constructs
+
+**Belief**
+```{r fig.height = 10, fig.width = 10}
+
+### subset group1 and select all columns from belief construct
+### Belief ###
+group1.belief.factor <- group1 %>%
+  select(Belief_1:Belief_10) %>%
+  mutate(Belief_1 = factor(Belief_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>% ### Have to turn each column into a factor with 7 levels in order for likert function to properly work. 
+  mutate(Belief_2 = factor(Belief_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_3 = factor(Belief_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_4 = factor(Belief_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_5 = factor(Belief_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_6 = factor(Belief_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_7 = factor(Belief_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_8 = factor(Belief_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_9 = factor(Belief_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Belief_10 = factor(Belief_10, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( 'Statistics helps makes sense of the world.' = Belief_1, 'Strong math skills are required to succeed in statistics.' = Belief_2, 'There is little use for statistics outside the classroom.' = Belief_3, 'Statistics is all about plugging numbers into formulas.' = Belief_4, 'Statistics can be manipulated to say whatever you want.' = Belief_5, 'Statistics help us solve complex problems in society.' = Belief_6, 'Statistics is broadly applicable in many fields.'  = Belief_7, 'Statistics is a tool for discovering patterns in data.'  = Belief_8, 'Statistics can be used to make peoples lives better.' = Belief_9, "Statistics is intimidating" = Belief_10 ) %>%
+  as.data.frame() ### Must save as a dataframe for likert package.
+
+group1.belief.likert <- likert(group1.belief.factor) ### Saving likert summary of belief construst
+
+plot(group1.belief.likert, ordered = F) + theme(axis.text=element_text(size=12)) ### Printing this out in a likert friendly view
+
+### Everything is consistant with the rest of the constructs for both groups.
+```
+
+**Intrinsic**
+
+```{r fig.height = 10, fig.width = 10}
+### Intrinsic ###
+group1.intrinsic.factor <- group1 %>%
+  select(Intrinsic_1:Intrinsic_7) %>%
+  mutate(Intrinsic_1 = factor(Intrinsic_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_2 = factor(Intrinsic_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_3 = factor(Intrinsic_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_4 = factor(Intrinsic_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_5 = factor(Intrinsic_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_6 = factor(Intrinsic_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Intrinsic_7 = factor(Intrinsic_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I want to learn statistics." = Intrinsic_1, "I want to learn statistics for professional opportunity and/or growth." = Intrinsic_2, "I want to learn statistics to be a better consumer of information." = Intrinsic_3, "I want to understand how statistics are used in everyday life." = Intrinsic_4, "I want to learn statistics so that I can be a competent citizen." = Intrinsic_5, "I want to learn statistics for my personal fulfillment." = Intrinsic_6,"I want to know statistics to make informed choices for myself (e.g. health, politics, etc.)." = Intrinsic_7) %>%
+  as.data.frame()
+
+group1.intrinsic.likert <- likert(group1.intrinsic.factor)
+
+plot(group1.intrinsic.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Extrinsic**
+
+```{r fig.height = 10, fig.width = 10}
+
+### Exstrinsic ###
+group1.exstrinsic.factor <- group1 %>%
+  select(Exstrinsic_1:Exstrinsic_8) %>%
+  mutate(Exstrinsic_1 = factor(Exstrinsic_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_2 = factor(Exstrinsic_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_3 = factor(Exstrinsic_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_4 = factor(Exstrinsic_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_5 = factor(Exstrinsic_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_6 = factor(Exstrinsic_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_7 = factor(Exstrinsic_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Exstrinsic_8 = factor(Exstrinsic_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I need to know statistics." = Exstrinsic_1, "I need to know statistics because it is required of me." = Exstrinsic_2, "I need to know statistics to obtain a degree/certification." = Exstrinsic_3, "I need to know statistics to satisfy employers." = Exstrinsic_4, "I need to know statistics because it will be expected of me in the future." = Exstrinsic_5, "I need to know statistics so that I appear intelligent to my peers." = Exstrinsic_6, "I need to know statistics because someone important to me wants me to." = Exstrinsic_7, "I need to know statistics because my family wants me to " = Exstrinsic_8) %>%
+  as.data.frame()
+
+group1.exstrinsic.likert <- likert(group1.exstrinsic.factor)
+
+plot(group1.exstrinsic.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Utility**
+
+```{r fig.height = 10, fig.width = 10}
+
+### Utility ###
+group1.utility.factor <- group1 %>%
+  select(Utility_1:Utility_8) %>%
+  mutate(Utility_1 = factor(Utility_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_2 = factor(Utility_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_3 = factor(Utility_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_4 = factor(Utility_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_5 = factor(Utility_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_6 = factor(Utility_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_7 = factor(Utility_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Utility_8 = factor(Utility_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I will use statistics in my career." = Utility_1, "Knowing statistics will help me look more appealing to employers." = Utility_2, "I will never use statistics in the future." = Utility_3, "Statistics is helpful for understanding the world around me." = Utility_4, "Statistics is irrelevant for my life." = Utility_5, "Statistics will help me understand news reports." = Utility_6, "I value statistics because it makes me an informed citizen." = Utility_7, "No one in my career field uses statistics." = Utility_8) %>%
+  as.data.frame()
+
+group1.utility.likert <- likert(group1.utility.factor)
+
+plot(group1.utility.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Attainment**
+
+```{r fig.height = 10, fig.width = 10}
+### Attainment ###
+group1.attainment.factor <- group1 %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(Attain_1 = factor(Attain_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_2 = factor(Attain_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_3 = factor(Attain_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_4 = factor(Attain_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_5 = factor(Attain_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_6 = factor(Attain_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_7 = factor(Attain_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I would only learn statistics if it helped me achieve my goals." = Attain_1, "If I could choose, I would never do statistics in the future." = Attain_2, "I do not care if I understand statistics." = Attain_3, "Understanding statistics empowers me." = Attain_4, " If I did poorly in a statistics course, I would be disappointed in myself." = Attain_5, "Doing well in statistics is important to my sense of self." = Attain_6, "If I am unable to interpret statistical results, I feel insecure." = Attain_7) %>%
+  as.data.frame()
+
+group1.attainment.likert <- likert(group1.attainment.factor)
+
+plot(group1.attainment.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Interest**
+
+```{r fig.height = 10, fig.width = 10}
+### Interest ###
+group1.interest.factor <- group1 %>%
+  select(Interest_1:Interest_9) %>%
+  mutate(Interest_1 = factor(Interest_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_2 = factor(Interest_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_3 = factor(Interest_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_4 = factor(Interest_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_5 = factor(Interest_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_6 = factor(Interest_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_7 = factor(Interest_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_8 = factor(Interest_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Interest_9 = factor(Interest_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I find statistics frustrating." = Interest_1, "I am interested in learning more about statistics." = Interest_2, "I find statistics boring." = Interest_3, "Using statistics to solve real-world problems is personally enjoyable." = Interest_4, "Doing statistics is fun for me." = Interest_5, "I am curious about statistics." = Interest_6, "I find little enjoyment in doing statistics." = Interest_7, "I dread statistics." = Interest_8, "I think conversations about statistics are stimulating." = Interest_9) %>%
+  as.data.frame()
+
+group1.interest.likert <- likert(group1.interest.factor)
+
+plot(group1.interest.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+
+```
+
+### Group 2 Likert Visualizations For All Hypothesized Constructs
+
+**Academic Self Concept**
+```{r fig.height = 10, fig.width = 10}
+### Comments are the same for each construct in group 2
+
+### Academic Self Concept ###
+group2.acadsc.factor <- group2 %>%
+  select(AcadSC_1:AcadSC_9) %>%
+  mutate(AcadSC_1 = factor(AcadSC_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_2 = factor(AcadSC_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_3 = factor(AcadSC_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_4 = factor(AcadSC_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_5 = factor(AcadSC_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_6 = factor(AcadSC_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_7 = factor(AcadSC_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_8 = factor(AcadSC_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(AcadSC_9 = factor(AcadSC_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "Doing well in school is important to me." = AcadSC_1, "I am confident that I can master learning difficult concepts." = AcadSC_2, "If I can't solve a problem right away, I will try again." = AcadSC_3, "I enjoy intellectual challenges." = AcadSC_4, "I avoid working on things that are intimidating to me." = AcadSC_5, "I like learning." = AcadSC_6, "When learning becomes difficult, I usually give up." = AcadSC_7, "When I struggle with new material, I feel that I am not learning." = AcadSC_8, "When I fail at something, I immediately give up." = AcadSC_9) %>%
+  as.data.frame()
+
+group2.acadsc.likert <- likert(group2.acadsc.factor)
+
+plot(group2.acadsc.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Attainment**
+
+```{r fig.height = 10, fig.width = 10}
+### Attain ###
+group2.attainment.factor <- group2 %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(Attain_1 = factor(Attain_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_2 = factor(Attain_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_3 = factor(Attain_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_4 = factor(Attain_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_5 = factor(Attain_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_6 = factor(Attain_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Attain_7 = factor(Attain_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I would only learn statistics if it helped me achieve my goals." = Attain_1, "If I could choose, I would never do statistics in the future." = Attain_2, "I do not care if I understand statistics." = Attain_3, "Understanding statistics empowers me." = Attain_4, " If I did poorly in a statistics course, I would be disappointed in myself." = Attain_5, "Doing well in statistics is important to my sense of self." = Attain_6, "If I am unable to interpret statistical results, I feel insecure." = Attain_7) %>%
+  as.data.frame()
+
+group2.attainment.likert <- likert(group2.attainment.factor)
+
+plot(group2.attainment.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Statistics Self Concept**
+
+```{r fig.height = 10, fig.width = 10}
+### Statistics Self Concept ###
+group2.statsc.factor <- group2 %>%
+  select(StatSC_1:StatSC_9) %>%
+  mutate(StatSC_1 = factor(StatSC_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_2 = factor(StatSC_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_3 = factor(StatSC_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_4 = factor(StatSC_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_5 = factor(StatSC_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_6 = factor(StatSC_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_7 = factor(StatSC_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_8 = factor(StatSC_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(StatSC_9 = factor(StatSC_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I am able to explain statistical results to others." = StatSC_1, "I am good at statistics." = StatSC_2, "If I keep working at it, I know I can solve most statistics problems." = StatSC_3, "I have trouble understanding statistics." = StatSC_4, "I lack the skills to do well in statistics." = StatSC_5, "I have the academic background to do well in statistics." = StatSC_6, "When I see a statistics question, I am unsure of how to begin." = StatSC_7, "I often need guidance to understand statistics." = StatSC_8, "When statistics becomes challenging, I stop trying." = StatSC_9) %>%
+  as.data.frame()
+
+group2.acadsc.likert <- likert(group2.acadsc.factor)
+
+plot(group2.acadsc.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Difficulty**
+
+```{r fig.height = 10, fig.width = 10}
+### Difficulty ###
+group2.difficulty.factor <- group2 %>%
+  select(Difficult_1:Difficult_7) %>%
+  mutate(Difficult_1 = factor(Difficult_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_2 = factor(Difficult_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_3 = factor(Difficult_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_4 = factor(Difficult_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_5 = factor(Difficult_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_6 = factor(Difficult_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Difficult_7 = factor(Difficult_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "You must work hard to understand statistics." = Difficult_1, "Interpreting statistical results is straightforward." = Difficult_2, "Statistics is easy." = Difficult_3, "Only smart people can do statistics." = Difficult_4, "Anybody can do statistics." = Difficult_5, "It is challenging to solve a problem that requires using statistics." = Difficult_6, "Learning statistics for the first time is hard." = Difficult_7) %>%
+  as.data.frame()
+
+group2.difficulty.likert <- likert(group2.difficulty.factor)
+
+plot(group2.difficulty.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+**Expectancy**
+
+```{r fig.height = 10, fig.width = 10}
+### Expectancy Value ###
+group2.expectancy.factor <- group2 %>%
+  select(Expectancy_1:Expectancy_11) %>%
+  mutate(Expectancy_1 = factor(Expectancy_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_2 = factor(Expectancy_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_3 = factor(Expectancy_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_4 = factor(Expectancy_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_5 = factor(Expectancy_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_6 = factor(Expectancy_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_7 = factor(Expectancy_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_8 = factor(Expectancy_8, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_9 = factor(Expectancy_9, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_10 = factor(Expectancy_10, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Expectancy_11 = factor(Expectancy_11, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "I struggle to interpret statistical results." = Expectancy_1, "I am able to make decisions that require statistical thinking." = Expectancy_2, "I can complete tasks that require basic statistical skills." = Expectancy_3, "I can interpret graphs when I see them." = Expectancy_4, "I can identify when statistics is misused." = Expectancy_5, "I find it challenging to decide which statistical method to use in a given context." = Expectancy_6, "I can use statistics to make informed decisions about my life." = Expectancy_7, "I am able to determine if data support a given hypothesis." = Expectancy_8, "I am able to describe the variability for a given data set." = Expectancy_9, "I can determine if a study is an experiment or observational." = Expectancy_10, "I struggle to identify biases that exist in a sample." = Expectancy_11) %>%
+  as.data.frame()
+
+group2.expectancy.likert <- likert(group2.expectancy.factor)
+
+plot(group2.expectancy.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+**Cost**
+
+```{r fig.height = 10, fig.width = 10}
+### Cost ###
+group2.cost.factor <- group2 %>%
+  select(Cost_1:Cost_7) %>%
+  mutate(Cost_1 = factor(Cost_1, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_2 = factor(Cost_2, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_3 = factor(Cost_3, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_4 = factor(Cost_4, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_5 = factor(Cost_5, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_6 = factor(Cost_6, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  mutate(Cost_7 = factor(Cost_7, levels = c("1", "2", "3", "4", "5", "6", "7"), ordered = TRUE)) %>%
+  dplyr::rename( "Learning statistics is a good use of my time." = Cost_1, "Acquiring statistical skills is worth the effort." = Cost_2, "I prioritize other tasks over statistics." = Cost_3, "I have more important things to do than spending time learning statistics." = Cost_4, "Taking statistics will limit my future prospects (for example, lower my GPA)." = Cost_5, "Learning statistics is worth spending money on." = Cost_6, "I avoid working on statistics because it makes me feel bad." = Cost_7) %>%
+  as.data.frame()
+
+group2.cost.likert <- likert(group2.cost.factor)
+
+plot(group2.cost.likert, ordered = FALSE) + theme(axis.text=element_text(size=12)) 
+```
+
+## Histograms of Hypothesized Constructs
+
+Now that we have visualized the individual items in many ways, let us create histograms of our hypothesized constructs. This will gives us a good idea of the shape and spread of our data relative to our hypothesized constructs (although, these are not expected to be perfect now).
+
+*It is important to note that when producing these graphs, we reverse coded negatively worded items as to not miscalculate true averages.*
+
+### Group 1
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+### Group 1 Constructs histrograms
+
+### Belief Construct
+group1.belief <- group1 %>% ### Choosing the group1 data
+  select(Belief_1:Belief_10) %>% ### Selecting the variabels that belong to this construct
+  mutate(means = rowMeans(.)) %>% ### Calculating means for each row (or student in this case) so that we can plot a histogram of the averages in the constructs.
+  select(means) ### Selecting only that column that had the mean values for each row
+
+plot.belief1 <- ggplot(group1.belief, aes(means)) + ### Plotting the means of each respondant
+  geom_histogram(color="black", fill="grey",) + ### creating the histogram
+  scale_x_continuous(name="Belief Construct", limits = c(0, 7)) ### labeling our x-axis
+
+
+### Code is exactly the same for each construct, expect we pull the unique variables for the given constructs. Each graph will have the same formatting as our x-axis values will never change.
+
+#View(round(cor(group1.rc), 2)) ### Correlation matrix of reverse coded items for group 1 to see if correlations remain positive (check SOMAS notes regarding why there are negatives)
+
+group1.rc <- group1 %>% ### Recoding each negatively worded item so averages calculate correctly.
+  mutate(Interest_1 = 8 - Interest_1) %>%
+  mutate(Interest_3 = 8 - Interest_3) %>%
+  mutate(Interest_8 = 8 - Interest_8) %>%
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  mutate(Interest_7 = 8 - Interest_7) %>%
+  mutate(Belief_10 = 8 - Belief_10) %>%
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  mutate(Utility_8 = 8 - Utility_8) %>%
+  mutate(Utility_3 = 8 - Utility_3) %>%
+  mutate(Utility_5 = 8 - Utility_5) %>%
+  mutate(Belief_3 = 8 - Belief_3) %>%
+  mutate(Belief_4 = 8 - Belief_4) %>%
+  mutate(Belief_5 = 8 - Belief_5) %>%
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  mutate(Belief_2 = 8 - Belief_2)
+
+### Intrinsic construct
+group1.intrinsic <- group1.rc %>%
+  select(Intrinsic_1:Intrinsic_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.intrinsic1 <- ggplot(group1.intrinsic, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Intrinsic Construct", limits = c(0, 7))
+
+### Exstrinsic construct
+group1.exstrinsic <- group1.rc %>%
+  select(Exstrinsic_1:Exstrinsic_8) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.exstrinsic1 <- ggplot(group1.exstrinsic, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Extrinsic Construct", limits = c(0, 7))
+
+### Utility Construct
+group1.utility <- group1.rc %>%
+  select(Utility_1:Utility_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.utility1 <- ggplot(group1.utility, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Construct", limits = c(0, 7))
+
+### Attain Construct
+group1.attain <- group1.rc %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.attain1 <- ggplot(group1.attain, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attain Construct", limits = c(0, 7))
+
+### Interest Construct
+group1.interest <- group1.rc %>%
+  select(Interest_1:Interest_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.interest1 <- ggplot(group1.interest, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Interest Construct", limits = c(0, 7))
+
+plot.attain1 + plot.interest1 + plot.exstrinsic1 + plot.intrinsic1 + plot.utility1 + plot.belief1 ### Wraps the histograms together
+
+```
+
+### Group 2
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+
+
+### Group 2 Constructs
+
+### The code is exactly the same as for group1, but now uses group2 data and unique constructs.
+
+#View(round(cor(group2.rc), 2)) ### Correlation matrix for group 2 reverse coded to see if it's all positive
+
+group2.rc <- group2 %>% ### Recoding each negatively worded item so averages calculate correctly.
+  mutate(Difficult_7 = 8 - Difficult_7) %>%
+  mutate(Difficult_1 = 8 - Difficult_1) %>%
+  mutate(StatSC_4 = 8 - StatSC_4) %>%
+  mutate(Difficult_6 = 8 - Difficult_6) %>%
+  mutate(StatSC_8 = 8 - StatSC_8) %>%
+  mutate(StatSC_7 = 8 - StatSC_7) %>%
+  mutate(Expectancy_6 = 8 - Expectancy_6) %>%
+  mutate(Expectancy_1 = 8 - Expectancy_1) %>%
+  mutate(Cost_5 = 8 - Cost_5) %>%
+  mutate(Cost_7 = 8 - Cost_7) %>%
+  mutate(StatSC_5 = 8 - StatSC_5) %>%
+  mutate(Cost_4 = 8 - Cost_4) %>%
+  mutate(Attain_2 = 8 - Attain_2) %>%
+  mutate(Attain_3 = 8 - Attain_3) %>%
+  mutate(Attain_1 = 8 - Attain_1) %>%
+  mutate(Cost_3 = 8 - Cost_3) %>%
+  mutate(AcadSC_9 = 8 - AcadSC_9) %>%
+  mutate(AcadSC_7 = 8 - AcadSC_7) %>%
+  mutate(AcadSC_5 = 8 - AcadSC_5) %>%
+  mutate(StatSC_9 = 8 - StatSC_9) %>%
+  mutate(AcadSC_8 = 8 - AcadSC_8) %>%
+  mutate(Difficult_4 = 8 - Difficult_4) %>%
+  mutate(Expectancy_11 = 8 - Expectancy_11)
+
+### AcadSC construct
+group2.acadSC <- group2.rc %>%
+  select(AcadSC_1:AcadSC_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.acadSC2 <- ggplot(group2.acadSC, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Academic Self Confidence (AcadSC) Construct", limits = c(0, 7))
+
+### Attain construct
+group2.attain <- group2.rc %>%
+  select(Attain_1:Attain_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.attain2 <- ggplot(group2.attain, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attain Construct", limits = c(0, 7))
+
+### StatSC construct
+group2.statSC <- group2.rc %>%
+  select(StatSC_1:StatSC_9) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.statSC2 <- ggplot(group2.statSC, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Statistics Self Confidence (StatSC) Construct", limits = c(0, 7))
+
+###Difficulty construct
+group2.difficult <- group2.rc %>%
+  select(Difficult_1:Difficult_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.difficult2 <- ggplot(group2.difficult, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Difficulty Construct", limits = c(0, 7))
+
+### Expectancy Construct
+group2.expectancy <- group2.rc %>%
+  select(Expectancy_1:Expectancy_11) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.expectancy2 <- ggplot(group2.expectancy, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Expectancy Construct", limits = c(0, 7))
+
+### Cost Construct
+group2.cost <- group2.rc %>%
+  select(Cost_1:Cost_7) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.cost2 <- ggplot(group2.cost, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Cost Construct", limits = c(0, 7))
+
+plot.cost2 + plot.expectancy2 + plot.difficult2 + plot.statSC2 + plot.acadSC2 + plot.attain2
+
+```
+
+# Factor Analysis
+
+For Factor Analysis, we first need to determine the appropriate number of factor to use. In order to accomplish this, let us perform Parallel Analysis.
+
+## Parallel Analysis
+
+For the first part of Parallel Analysis, we will obtain eigenvalues from our data. Eigenvalues can show us the appropriate number of factors we have in our data, and Exploratory Factor Analysis can show us which questions are loading onto which factors.
+
+```{r}
+
+### We now will generate a numeric matrix of the data for each group. We must have a numeric matrix when calculating eigenvalues, but NOT when running the EFA. Eigenvalues can show us the appropriate number of factors, EFA will load the questions onto the factors (two seperate analyses).
+
+group1.matrix <- apply(as.matrix(group1), 2, as.numeric) %>% ### Group 1 numeric matrix
+  cor(na.omit(.))
+
+group2.matrix <- apply(as.matrix(group2), 2, as.numeric) %>% ### Group 2 numeric matrix
+  cor(na.omit(.))
+
+
+### Calculating the eigen values for each group. These values will be used for our parallel analysis and scree plot generation
+
+group1.eigen <- eigen(group1.matrix)$values ### Group 1 eigen values
+
+group2.eigen <- eigen(group2.matrix)$values ### Group 2 eigen values
+```
+
+## Scree Plots
+
+Now that we have obtained our eigen values for group 1 and group 2, we can move forward with the rest of parallel analysis and scree plot generation. 
+
+Scree plot generation can help us visualize our eigen values and determine the number of factors we have in our data. When generating these scree plots, contrary to the eigenvalue generation, we will be using the raw data and not a numeric matrix. 
+
+In our generation of scree plots, there are a few arguments we can use. One of these arguments is the **cent** argument. In this argument, for group 1, we obtained a factor level of 4 or 5 depending on our cent level. Glorfeld 1995 & Hayton 2004 suggest a cent=.95, which is a more conservative approach. Parallel analysis tends to overestimate the number of factors, so we should consider using .95.
+
+### Group 1
+
+For group 1, we will be using cent=0.5, although it is important to keep in mind that we were obtaining 4 factors with cent=0.95. The purpose for using cent = 0.5 and not 0.95 as advised by Glorfeld and Hayton is because we can simply drop this last factor if we are seeing very small loadings (since this is exploratory research).
+
+```{r message=FALSE, warning=FALSE, cache=TRUE}
+
+### We now will conduct parallel analysis to determine to appropriate number of factors for each of our groups. Parallel analysis can be done in a variety of ways, and for our case we will be plotting our eigen values on a scree plot, as well as geneating a scree plot from the raw data (which will in itself use eigenvalues, but has potential for other data manipulation within the fuction)
+
+### Important note about our centile selection: Glorfeld 1995 & Hayton 2004 suggest a cent=.95, which is a more conservative approach. Parallel analysis tends to overestimate the number of factors, so we should consider using .95
+
+### Hayton suggest using both average and 0.95. When using cent .95, we obtain 4 factors, and for .05, we obtain 5. We should stick with 0.95 to be more conservative and not overestimate the amount of factors we may have.
+
+### We check this for both parallel and fa.parallel function and they yieled similar results when comparing the two. Sticking with .95 for both.
+
+
+##### Since scree plots deal with simulated data, when using cent=0.95, we are obtaining 4 or 5 factors (depedent on the simulation results). 
+
+
+### Parallel Analysis using cent=0.95
+group1.parallel1_1 <- parallel(subject=n1, var=ncol(group1.matrix), rep=100, cent=0.95) ### Performing the Parallel Analysis.
+
+#Create a scree plot from the parallel analysis results, but I like the plotnScree results better
+# plotParallel(paran, x=eigen$values)
+
+#nScree function comes from nFactors package
+# screeresults<-nScree(eigen$values, aparallel = paran$eigen$qevpea)
+# screeresults
+
+#Scree plot of parallel analysis 
+#from nFactors package
+# plotnScree(screeresults)
+#We can see from the output that the Eigenvalue-Greater-Than-One criteria would retain 3 factors, although the third eigenvalue is only marginally larger than one. Parallel analysis identifies two factors.
+
+##MY OWN SCREE PLOT
+
+#Create data fram with observed and simulated eigenvalues
+obs <- data.frame(group1.eigen)
+#add columns for type, number
+obs$type = c('Observed Data')
+obs$num = c(1:49)
+colnames(obs) = c('eigenvalue', 'type', 'num')
+
+sim <- data.frame(group1.parallel1_1$eigen$qevpea)
+sim$type <- c('Simulated Data')
+sim$num <- c(1:49)
+colnames(sim) = c('eigenvalue', 'type', 'num')
+
+screevals <- rbind(obs, sim)
+
+##APA Theme
+apatheme=theme_bw()+
+theme(panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(),
+panel.background = element_blank(),
+panel.border = element_blank(),
+text=element_text(family='Arial'),
+legend.title=element_blank(),
+legend.position=c(.7,.8),
+axis.line.x = element_line(color='black'),
+axis.line.y = element_line(color='black'))
+
+#Create the Plot
+#Use data from eigendat. Map number of factors to x-axis, eigenvalue to y-axis, and give different data point shapes depending on whether eigenvalue is observed or simulated
+p3 <- ggplot(screevals, aes(x=num, y=eigenvalue, shape=type)) +
+  #Add lines connecting data points
+geom_line()+
+  #Add the data points.
+geom_point(size=1)+
+  #Label the y-axis 'Eigenvalue'
+scale_y_continuous(name='Eigenvalue')+
+  #Label the x-axis 'Factor Number', and ensure that it ranges from 1-max # of factors,     increasing by one with each 'tick' mark.
+scale_x_continuous(name='Factor Number', limits=c(1, 49))+
+  #Manually specify the different shapes to use for actual and simulated data, in this case, white and black circles.
+scale_shape_manual(values=c(16,1)) +
+  #Add vertical line indicating parallel analysis suggested max # of factors to retain
+#geom_vline(xintercept = 2, linetype = 'dashed')+
+  #apa-formatting theme
+apatheme
+
+#Call the plot
+p3
+
+#ggsave('parallel_rect.png', width=4, height=2.5, unit='in', dpi=300)
+
+
+### Parallel Analysis using cent=0.05
+#group1.parallel1_2 <- parallel(subject=n1, var=ncol(group1.matrix), rep=100, cent=0.5) ### cent=0.05 is producing ore factors than cent=0.95
+
+#group1.scree1_2 <- nScree(group1.eigen, aparallel = group1.parallel1_2$eigen$qevpea) ### Determinining with a Scree plot of eigen values
+
+#plot1.scree1_2 <- plotnScree(group1.scree1_2, main="Scree Plot for Group 1") ### The Scree plot shows 5 potential factors
+
+#group1.parallel2_1 <- fa.parallel(group1, n.iter=20, fa="fa", fm="pa", quant=.95, correct=0, cor="poly") ### Another method for determining number of factors (this method also shows 3). We use correct=0 based off Savalei paper which reccomends correct of 0 for out type of data.
+#group1.parallel2_2 <- fa.parallel(group1, n.iter=20, fa="fa", fm="pa", quant=.95, correct=.5) ### Using a correct=.5 instead, but yielding similar results
+```
+
+From this scree plot, we are seeing that we should extract 5 factors from our data. We will keep this in mind when moving to EFA.
+
+### Group 2
+
+For group 2, we are obtaining the same number of factors regardless of our cent value. This can give us some level of confidence in this number, but this is still exploratory so we cannot say another for certain yet.
+
+```{r message=FALSE, warning=FALSE, cache=TRUE}
+### Parallel Analysis for Group 2 w/ same comments
+
+### Parallel Analysis using cent=0.95
+group2.parallel1_1 <- parallel(subject=n2, var=ncol(group2.matrix), rep=100, cent=0.95) ### Obtaining 5 factors with 0.95
+
+#group2.scree1_1 <- nScree(group2.eigen, aparallel = group2.parallel1_1$eigen$qevpea)
+
+#plot2.scree1_1 <- plotnScree(group2.scree1_1, main="Scree Plot for Group 2") ### The Scree plot is showing 5 potential factors
+
+#Create a scree plot from the parallel analysis results, but I like the plotnScree results better
+# plotParallel(paran, x=eigen$values)
+
+#nScree function comes from nFactors package
+# screeresults<-nScree(eigen$values, aparallel = paran$eigen$qevpea)
+# screeresults
+
+#Scree plot of parallel analysis 
+#from nFactors package
+# plotnScree(screeresults)
+#We can see from the output that the Eigenvalue-Greater-Than-One criteria would retain 3 factors, although the third eigenvalue is only marginally larger than one. Parallel analysis identifies two factors.
+
+##MY OWN SCREE PLOT
+
+#Create data fram with observed and simulated eigenvalues
+obs2 <- data.frame(group2.eigen)
+#add columns for type, number
+obs2$type = c('Observed Data')
+obs2$num = c(1:50)
+colnames(obs2) = c('eigenvalue', 'type', 'num')
+
+
+sim2 <- data.frame(group2.parallel1_1$eigen$qevpea)
+sim2$type <- c('Simulated Data')
+sim2$num <- c(1:50)
+colnames(sim2) = c('eigenvalue', 'type', 'num')
+
+
+screevals2 <- rbind(obs2, sim2)
+
+
+##APA Theme
+apatheme=theme_bw()+
+theme(panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(),
+panel.background = element_blank(),
+panel.border = element_blank(),
+text=element_text(family='Arial'),
+legend.title=element_blank(),
+legend.position=c(.7,.8),
+axis.line.x = element_line(color='black'),
+axis.line.y = element_line(color='black'))
+
+#Create the Plot
+#Use data from eigendat. Map number of factors to x-axis, eigenvalue to y-axis, and give different data point shapes depending on whether eigenvalue is observed or simulated
+p4 <- ggplot(screevals2, aes(x=num, y=eigenvalue, shape=type)) +
+  #Add lines connecting data points
+geom_line()+
+  #Add the data points.
+geom_point(size=1)+
+  #Label the y-axis 'Eigenvalue'
+scale_y_continuous(name='Eigenvalue')+
+  #Label the x-axis 'Factor Number', and ensure that it ranges from 1-max # of factors,     increasing by one with each 'tick' mark.
+scale_x_continuous(name='Factor Number', limits=c(1, 50))+
+  #Manually specify the different shapes to use for actual and simulated data, in this case, white and black circles.
+scale_shape_manual(values=c(16,1)) +
+  #Add vertical line indicating parallel analysis suggested max # of factors to retain
+#geom_vline(xintercept = 2, linetype = 'dashed')+
+  #apa-formatting theme
+apatheme
+
+#Call the plot
+p4
+
+#ggsave('parallel_rect2.png', width=4, height=2.5, unit='in', dpi=300)
+
+
+### Parallel Analysis using cent=0.05
+#group2.parallel1_2 <- parallel(subject=n2, var=ncol(group2.matrix), rep=100, cent=0.05) ### Obtaining 5 factors with 0.05
+
+#group2.scree1_2 <- nScree(group2.eigen, aparallel = group2.parallel1_2$eigen$qevpea)
+
+#plot2.scree1_2 <- plotnScree(group2.scree1_2, main="Scree Plot for cent=0.05") ### The Scree plot is showing 5 potential factors
+
+### When comparing these two graphs, we see they produce the same amount of factors, so we will stick with cent=0.95 as it is a more conservative approach and we still obtain the same number of factors.
+
+#group2.parallel2_1 <- fa.parallel(group2, n.iter=20, fa="fa", fm="pa", quant=.95, correct=0, cor="poly") ### Another method for determining number of factors (this method also shows 4). We use correct=0 based off Savalei paper which reccomends correct of 0 for out type of data.
+#group2.parallel2_2 <- fa.parallel(group2, n.iter=20, fa="fa", fm="pa", quant=.95, correct=.5, cor="poly") ### Using a correct=.5 instead, but yielding similar results
+```
+
+For group 2, we obtained 5 potential factors with the scree plot, so we will move forward with EFA keeping in mind this number.
+
+We will now load our variables onto the amount of factors we obtained from Parallel Analysis.
+
+## Skew and Kurtosis
+
+Before we go ahead with EFA, we will check skew and kurtosis to see if we are horribly violating our normality assumptions. For similar preseasons why we visualized our data so indepthly, the normality violations of our data can determine possible limitations with EFA arguments.
+
+Violations follow these stipulations:
+
+* Skew < 3
+* Kurtosis < 10
+
+```{r}
+### Skew and kurtosis for group 1
+
+group1.skew <- round(max(abs(skewness(group1))), 2) ### Skew
+
+group1.kurtosis <- round(max(abs(kurtosis(group1))), 2) ### Kurtosis
+
+### Skew and kurtosis for group 2
+
+group2.skew <- round(max(abs(skewness(group2))), 2)
+
+group2.kurtosis <-round(max(abs(kurtosis(group2))), 2)
+
+### All other kurtosis values are below 10
+```
+
+### Group 1
+
+For group 1, we obtained a maximum skew value of **`r group1.skew`**, which is below our threshold, and a maximum kurtosis value of **`r group1.kurtosis`**, which is also below our threshold. For group 1, there are not any normality assumptions.
+
+### Group 2
+
+For group 2, we obtained a maximum skew value of **`r group2.skew`**, which is above our threshold, and a maximum kurtosis value of **`r group2.kurtosis`**, which is also below our threshold. For group 2, there are not any normality assumptions.
+
+# Exploratory Factor Analysis
+
+After Parallel Analysis and determining our maximum skew and kurtosis values, we can move ahead with Exploratory Factor Analysis. EFA will be conducted on each group separately, using what we obtained from parallel analysis, skew and kurtosis generation and our summary statistics.
+
+There are a few functions you can use for EFA. We considered both the fa and factanal functions, but decided to go with the fa function in the end. The factanal function assumes normality (which we could go ahead with since skew and kurtosis are fine), but also limits the arguments we can use in the data. The fa function allows for a more specific EFA argumentation.
+
+Within the fa function, we are performing a promax rotation with a factoring method doing the principal factor solution. Along with this, we are using a polychoric correlation because we have data from a Likert scale, making our data ordinal and not continuous. This requires a polychoric correlation. 
+
+Using the fa function, we looked at two possible outcomes, one with a correction = 0 and one with a correction = 0.5. This correction determines how we should treat empty cells, but in the end did not change our loadings much at all. We went ahead with a correction = 0.
+
+These arguments and function selection are consistent across both the groups.
+
+## Sorting Method
+
+We also will be printing out two versions of the loadings for each group: one where the variables are ordered (designed to show how well constructs are holding up), and another where the loadings are ordered by magnitude and factor (where we can see what the new constructs are looking like). Visualizing these loadings in these two different ways can help us when it comes to interpreting our EFA results and making decisions about question wording and new hypothesized constructs.
+
+### Group 1
+
+For group 1, we will be conducting a 5 factor EFA. We are using 5 factors as this is what we obtained from our scree plot generation when looking at cent = 0.05. We may expect to see one factor will very few loadings since we obtained 4 factors when cent = 0.95. If this is the case, we can look at 4 factors in the future. 
+
+**5 Factors (sorted by variable name)**
+
+```{r, cache=TRUE}
+### We will run an EFA using the number of factors we obtained from parallel analysis. We obtained 5 factor from both parallel analysis methods, so no let us load our factor loadings onto the factors themselves.
+
+### We will cut off the factors at 0.4 as this is what we consider significant.
+
+### fa function will have two continuity correction to test.
+
+#group1.fa5_1 <- fa(r = group1, nfactors = 5, rotate="promax", fm="pa", cor="poly", correct=0.5) ### We will use fa instead of factanal since our data is not normal (factanal assumes normal data). correction = 0.5
+#print(group1.fa5_1$loadings, cutoff=0.4) ### printing out results.
+
+group1.fa5_2 <- fa(r = group1, nfactors = 5, rotate="promax", fm="pa", cor="poly", correct=0) ### correct = 0
+print(group1.fa5_2$loadings, cutoff=0.4) ### printing out results.
+
+#group1.fanal5 <- factanal(group1, n.obs=n1, factors = 5, rotation="promax") ### This command produces a much more readable and coherent table of the factor loadings, but should only be used when our data is normal.
+#print(group1.fanal5$loadings, cutoff=0.4) ### printing out results.
+
+#group1.fa5_loadings <- unclass(group1.fa5_2$loadings) %>%
+  #round(3) %>%
+  #as.data.frame() %>%
+  #dplyr::rename(FA5_1 = PA1, FA5_2 = PA2, FA5_3 = PA3, FA5_4 = PA4, FA5_5 = PA5)
+```
+
+**5 Factors (sorted by loading magnitude)**
+
+```{r}
+group1.sorted <- unclass(fa.sort(group1.fa5_2)) ### Unclass to determine where the loadings are located and extract them
+
+group1.sorted <- group1.sorted$loadings ### Pulling our loadings
+
+print(group1.sorted, cutoff=0.4) ### Printing the sorted loadings with a cutoff of 0.4.
+
+```
+
+### Group 2
+
+For group 2, we clearly obtained 5 factors from our scree plots, so we will do a 5 factor EFA using the same arguments and function as group 1.
+
+**5 Factors (sorted by variable name)**
+
+```{r, cache=TRUE}
+### The original paper uses 5 factors, so we will test this and see if things are looking similar
+
+#group2.fa5_1 <- fa(r = group2, nfactors = 5, n.obs=n2, rotate="promax", fm="pa", cor="poly", correct=0.5)
+#print(group2.fa5_1$loadings, cutoff=0.4)
+
+group2.fa5_2 <- fa(r = group2, nfactors = 5, n.obs=n2, rotate="promax", fm="pa", cor="poly", correct=0)
+print(group2.fa5_2$loadings, cutoff=0.4)
+
+#group2.fanal5 <- factanal(group2, n.obs=n2, factors = 5, rotation="promax")
+#print(group2.fanal5$loadings, cutoff=0.4)
+
+#group2.fa5_loadings <- unclass(group2.fa5_2$loadings) %>%
+  #round(3) %>%
+  #as.data.frame() %>%
+  #dplyr::rename(FA5_1 = PA1, FA5_2 = PA2, FA5_3 = PA3, FA5_4 = PA4, FA5_5 = PA5)
+```
+
+**5 Factors (sorted by loading magnitude)**
+
+```{r}
+group2.sorted <- unclass(fa.sort(group2.fa5_2)) ### Unclass to determine where the loadings are located and extract them
+
+group2.sorted <- group2.sorted$loadings ### Pulling our loadings
+
+print(group2.sorted, cutoff=0.4) ### Printing the sorted loadings with a cutoff of 0.4.
+```
+
+## Histograms of New Empirical Factors
+
+The Effort Scale in the SATS has an issue with being too skewed where students are overall believing they put a lot of effort into learning statistics, regardless of the outcome or change in knowledge. Visualizing these new empirical factors may show some issues that can be addressed in future edits.
+
+### Group 1
+
+Histograms of each empirical factor determined from Factor Analysis for Group 2.
+
+```{r message=FALSE, warning=FALSE}
+
+### Interest/Enjoyment Factor
+group1.fa1 <- group1.rc %>% ### Using recorded data for group 1
+  select(Interest_1, Interest_3, Interest_8, Interest_5, Attain_2, Belief_10, Interest_7, Interest_2, Intrinsic_1, Interest_4, Intrinsic_6, Interest_6, Attain_1, Attain_3) %>% ### Selecting the items in the new factor
+  mutate(means = rowMeans(.)) %>% ### Calculate mean scores for each row
+  select(means) ### Select only the means
+
+plot.group1.fa1 <- ggplot(group1.fa1, aes(means)) + ### plot the means in a histogram
+  geom_histogram(color="black", fill="grey",) + ### design
+  scale_x_continuous(name="Interest/Enjoyment", limits = c(0, 7)) ### x-axis scale
+
+
+### Code is similar for the following new factors
+group1.fa2 <- group1.rc %>%
+  select(Utility_6, Utility_4, Utility_7, Belief_9, Intrinsic_7, Belief_1, Belief_6, Intrinsic_3, Intrinsic_5, Belief_8, Belief_7, Belief_3, Intrinsic_4) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa2 <- ggplot(group1.fa2, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Value (personal/societal)", limits = c(0, 7))
+
+group1.fa3 <- group1.rc %>%
+  select(Exstrinsic_5, Exstrinsic_4, Utility_1, Exstrinsic_2, Utility_8, Exstrinsic_3, Exstrinsic_1, Utility_2, Utility_3, Intrinsic_2) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa3 <- ggplot(group1.fa3, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Value (career/future)", limits = c(0, 7))
+
+group1.fa4 <- group1.rc %>%
+  select(Exstrinsic_8, Exstrinsic_7, Exstrinsic_6) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa4 <- ggplot(group1.fa4, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Extrinsic Motivation", limits = c(0, 7))
+
+group1.fa5 <- group1.rc %>%
+  select(Attain_5, Attain_6, Attain_7, Belief_10) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa5 <- ggplot(group1.fa5, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attainment Value", limits = c(0, 7))
+
+#plot.group1.fa1 
+#ggsave('g1fa1.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa2
+#ggsave('g1fa2.png', width=2.6, height=4, unit='in', dpi=300)
+#plot.group1.fa3
+#ggsave('g1fa3.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa4
+#ggsave('g1fa4.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa5
+#ggsave('g1fa5.png', width=2.5, height=4, unit='in', dpi=300)
+
+
+plot.group1.fa1  + plot.group1.fa2  + plot.group1.fa3  + plot.group1.fa4  + plot.group1.fa5
+```
+
+### Group 2
+
+Histograms of each empirical factor determined from Factor Analysis for Group 2.
+
+```{r message=FALSE, warning=FALSE}
+
+### AcadSC construct
+group2.fa1 <- group2.rc %>%
+  select(Difficult_7, Difficult_1, Difficult_3, StatSC_4, Difficult_6, StatSC_8, StatSC_7, Expectancy_6, Expectancy_1, StatSC_2, Cost_5, Difficult_2, Cost_7, StatSC_5) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa1 <- ggplot(group2.fa1, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Difficulty", limits = c(0, 7))
+
+group2.fa2 <- group2.rc %>%
+  select(Expectancy_4, Expectancy_2, Expectancy_5, Expectancy_3, Expectancy_10, Expectancy_8, StatSC_1, AcadSC_2, Expectancy_7, StatSC_6, StatSC_3, Expectancy_9, Expectancy_11) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa2 <- ggplot(group2.fa2, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Expectancy/Self-Efficacy", limits = c(0, 7))
+
+group2.fa3 <- group2.rc %>%
+  select(Cost_1, Cost_4, Cost_6, Attain_2, Cost_2, Cost_3, Attain_3, Attain_4, Attain_1) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa3 <- ggplot(group2.fa3, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Personal Costs/Benefits", limits = c(0, 7))
+
+group2.fa4 <- group2.rc %>%
+  select(AcadSC_9, AcadSC_7, AcadSC_5, StatSC_9, AcadSC_3) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa4 <- ggplot(group2.fa4, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Academic Perseverance", limits = c(0, 7))
+
+group2.fa5 <- group2.rc %>%
+  select(Attain_5, Attain_6, Attain_7, AcadSC_1) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa5 <- ggplot(group2.fa5, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attainment Value", limits = c(1, 7))
+
+#plot.group2.fa1 
+#ggsave('g2fa1.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa2
+#ggsave('g2fa2.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa3
+#ggsave('g2fa3.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa4
+#ggsave('g2fa4.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa5
+#ggsave('g2fa5.png', width=2.5, height=4, unit='in', dpi=300)
+
+plot.group2.fa1  + plot.group2.fa2  + plot.group2.fa3  + plot.group2.fa4  + plot.group2.fa5
+```
+
+## Tables of Means and Standard Deviations for each new Empirical Factor
+
+We will generate a table for each group of the mean and standard deviation for both groups.
+
+### Group 1
+
+```{r}
+
+group1.fa.means <- c(mean(data.matrix(group1.fa1)), mean(data.matrix(group1.fa2)), mean(data.matrix(group1.fa3)), mean(data.matrix(group1.fa4)), mean(data.matrix(group1.fa5))) %>% ### calculating the mean of each factor for group 1
+  round(3) %>% ### round values to 3
+  as.data.frame() ### save as a data frame
+
+### same for std. devs.
+group1.fa.sds <- c(sd(data.matrix(group1.fa1)), sd(data.matrix(group1.fa2)), sd(data.matrix(group1.fa3)), sd(data.matrix(group1.fa4)), sd(data.matrix(group1.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group1.fa.names <- c("Interest/Enjoyment", "Utility Value (personal/societal", "Utility Value (career/future)", "Extrinsic Motivation", "Attainment Value") %>%
+  as.data.frame() ### names of the factors for group 1
+
+group1.fa.table <- bind_cols(group1.fa.names, group1.fa.means, group1.fa.sds) ### bind data together to make a table.
+
+kable(group1.fa.table, col.names = c("Factor Name", "Mean", "Standard Deviation"), caption = "Means and Std. Devs. for Empirical Factors in Group 1") %>%
+  kable_styling(full_width = FALSE, position = "center") ### generating the table
+```
+
+### Group 2
+
+```{r}
+### same code for group 2
+group2.fa.means <- c(mean(data.matrix(group2.fa1)), mean(data.matrix(group2.fa2)), mean(data.matrix(group2.fa3)), mean(data.matrix(group2.fa4)), mean(data.matrix(group2.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group2.fa.sds <- c(sd(data.matrix(group2.fa1)), sd(data.matrix(group2.fa2)), sd(data.matrix(group2.fa3)), sd(data.matrix(group2.fa4)), sd(data.matrix(group2.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group2.fa.names <- c("Difficulty", "Expectancy/Self-Efficacy", "Personal Costs/Benefits", "Academic Perseverace", "Attainment Value") %>%
+  as.data.frame()
+
+group2.fa.table <- bind_cols(group2.fa.names, group2.fa.means, group2.fa.sds)
+
+kable(group2.fa.table, col.names = c("Factor Name", "Mean", "Standard Deviation"), caption = "Means and Std. Devs. for Empirical Factors in Group 2") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+# Summaries and Future Implications
+
+We now will discuss some of the implications and findings from the results above, as well as take a visual representation of how the theoretical constructs now map onto the empirical factors.
+
+## Sankey Diagrams
+
+We will use a Sankey diagram to path each theoretical construct to their new empirical factors.
+
+### Group 1
+
+Sankey Diagram for Group 1.
+
+```{r, cache=FALSE}
+
+# A single item from Extrinsic to Interest/Enjoyment is not supported by the current factor structure (error? there were only 8 items to begin with)
+links <- data.frame(source=c("Beliefs and Sterotypes", "Beliefs and Sterotypes", "Beliefs and Sterotypes", "Beliefs and Sterotypes", "Intrinsic Motivation" , "Intrinsic Motivation", "Intrinsic Motivation", "Extrinsic Motivation", "Extrinsic Motivation", "Utility Value", "Utility Value", "Attainment Value", "Attainment Value", "Interest/Enjoyment" ),
+                    target=c("Interest/Enjoyment ", "Utility Value (personal/societal)", "Extrinsic Motivation ", "Attainment Value ", "Interest/Enjoyment ", "Utility Value (personal/societal)", "Utility Value (future/career)", "Utility Value (future/career)", "Extrinsic Motivation ", "Utility Value (personal/societal)", "Utility Value (future/career)", "Interest/Enjoyment ", "Attainment Value ", "Interest/Enjoyment "), 
+                    value=c(1, 6, 1, 1, 2, 4, 1, 5, 3, 3, 4, 3, 3, 9))
+
+### source are our theorized constructs
+### target is where the theorized construct now "goes" or where its items are loading now
+### vaule is the amount of questions that go from our theorized construct to new empirical factor
+
+nodes <- data.frame(name=c(as.character(links$source), as.character(links$target)) %>% unique()) ### creating node names
+
+links$IDsource <- match(links$source, nodes$name) - 1 ### necessary step so the graph actually prints
+links$IDtarget <- match(links$target, nodes$name) - 1 ### necessary step so the graph actually prints
+
+
+
+p <- sankeyNetwork(Links = links, Nodes = nodes,
+              Source = "IDsource", Target = "IDtarget",
+              Value = "value", NodeID = "name", fontSize = 14, nodeWidth = 30, 
+              sinksRight=FALSE) ### generating the sankey diagram with the designed format
+
+p ### print it
+
+```
+
+### Group 2
+
+Sankey Diagram for Group 2.
+
+```{r}
+### same code for group 2
+
+links2 <- data.frame(source=c("Academic Self Concept", "Academic Self Concept", "Academic Self Concept", "Attainment Value", "Attainment Value", "Statistics Self Concept", "Statistics Self Concept", "Statistics Self Concept", "Difficulty", "Expectancy Value", "Expectancy Value", "Expectancy Value", "Cost", "Cost"),
+                    target=c("Expectancy/Self-efficacy", "Academic Perseverance", "Attainment Value ", "Personal Costs/Benefits", "Attainment Value ", "Difficulty ", "Expectancy/Self-efficacy", "Academic Perseverance", "Difficulty ",  "Difficulty ", "Expectancy/Self-efficacy", "Personal Costs/Benefits", "Difficulty ", "Personal Costs/Benefits"), 
+                    value=c(1, 4, 1, 5, 3, 5, 3, 1, 5, 2, 9, 1, 2, 5))
+
+nodes2 <- data.frame(name=c(as.character(links2$source), as.character(links2$target)) %>% unique())
+
+links2$IDsource <- match(links2$source, nodes2$name) - 1
+links2$IDtarget <- match(links2$target, nodes2$name) - 1
+
+
+
+p2 <- sankeyNetwork(Links = links2, Nodes = nodes2,
+              Source = "IDsource", Target = "IDtarget",
+              Value = "value", NodeID = "name", fontSize = 14, nodeWidth = 30,
+              sinksRight=FALSE)
+
+p2
+
+
+```
+
+## Specifics About Our Loadings
+
+### Group 1
+
+**How Many Items Have No Loadings > |0.4|:**
+
+We have **5** items with insignificant loadings:
+
+* Belief_2
+* Belief_4
+* Belief_5
+* Utility_5 
+* Attain_4
+
+**How Many Items Cross-Load:**
+
+We have **1** items with cross-loadings:
+
+* Belief_10
+
+**How Many Items Have A "Clean" Factor:**
+
+We have **43** items with clean loadings (all items for group 1 but those listed above).
+
+### Group 2
+
+**How Many Items Have No Loadings > |0.4|:**
+
+We have **5** items with insignificant loadings:
+
+* AcadSC_4
+* AcadSC_6
+* AcadSC_8
+* Difficult_4
+* Difficult_5
+
+**How Many Items Cross-Load:**
+
+We have **2** items with cross-loadings:
+
+* Attain_6
+* Expectancy_7
+
+**How Many Items Have A "Clean" Factor:**
+
+We have **44** items with clean loadings (all items for group 2 but those listed above).
+
+## What Can We Theorize About Our New Factors?
+
+We obtained new constructs from EFA with many items from multiple constructs making up our new constructs. This means we most likely will have new definitions for our constructs. We will look to analyze the questions in each of the new constructs and define what this construct may be attempting to capture.
+
+*IMPORTANT NOTE: (-) represents the item is negatively worded.*
+
+### Group 1
+
+I will list the questions for each new construct and give some idea of how/why these questions are loading together.
+
+**New Factor 1 (Interest/Enjoyment)**
+
+Variables in our Factor:
+                   
+* Utility_6: Statistics will help me understand news reports.
+* Utility_7: I value statistics because it makes me an informed citizen.
+* Intrinsic_7: I want to know statistics to make informed choices for myself (e.g. health, politics, etc.).
+* Intrinsic_3: I want to learn statistics to be a better consumer of information.
+* Utility_4: Statistics is helpful for understanding the world around me.
+* Belief_1: Statistics helps makes sense of the world.
+* Belief_9: Statistics can be used to make people's lives better.
+* Intrinsic_5: I want to learn statistics so that I can be a competent citizen.
+* Belief_6: Statistics help us solve complex problems in society.
+* Belief_8: Statistics is a tool for discovering patterns in data.
+* Belief_7: Statistics is broadly applicable in many fields.
+* Intrinsic_4: I want to understand how statistics are used in everyday life.
+* (-) Belief_3: There is little use for statistics outside the classroom. ***newly loaded with spring data***
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the usefulness of statistics in personal and societal terms. This is captured mainly through positively worded items.
+
+
+**New Factor 2 (Utility Value (personal/societal))**
+
+Variables in our Factor:
+
+* (-) Interest_1: I find statistics frustrating.
+* (-) Interest_3: I find statistics boring.
+* (-) Interest_8: I dread statistics.
+* (-) Attain_2: If I could choose, I would never do statistics in the future.
+* (-) Interest_7: I find little enjoyment in doing statistics.
+* Interest_5: Doing statistics is fun for me.
+* (-) Belief_10: Statistics is intimidating.
+* (-) Attain_1: I would only learn statistics if it helped me achieve my goals.
+* Interest_2: I am interested in learning more about statistics.
+* Interest_4: Using statistics to solve real-world problems is personally enjoyable  
+* Interest_9: I think conversations about statistics are stimulating.     
+* Intrinsic_1: I want to learn statistics.     
+* Interest_6: I am curious about statistics.   
+* Intrinsic_6: I want to learn statistics for my personal fulfillment.
+
+*Negatively worded items load positively due to the amount of negative items and their loading magnitudes.*
+
+Potential New Definition:
+
+This factor seems to be pertaining to the interest of statistics. Interest seems to be captured mainly with negatively worded items.
+
+**New Factor 3 (Utility Value (future/career)**
+
+Variables in our Factor:====
+
+* Utility_1: I will use statistics in my career.
+* Extrinsic_5: I need to know statistics because it will be expected of me in the future.
+* (-) Utility_8: No one in my career field uses statistics.
+* Extrinsic_4:  I need to know statistics to satisfy employers.
+* (-) Utility_3: I will never use statistics in the future.
+* Extrinsic_1: I need to know statistics.
+* (-) Utility_5: Statistics is irrelevant for my life.
+* Extrinsic_2: I need to know statistics because it is required of me. ***newly loaded***
+* Utility_2: Knowing statistics will help me look more appealing to employers.
+* Intrinsic_2: I want to learn statistics for professional opportunity and/or growth.
+* Extrinsic_3:  I need to know statistics to obtain a degree/certification.
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the usefulness of statistics in regards to their career and future.
+
+**New Factor 4 (Extrinsic Motivation)**
+
+Variables in our Factor:
+
+* Extrinsic_8: I need to know statistics because my family wants me to. 
+* Extrinsic_7: I need to know statistics because someone important to me wants me to. 
+* Extrinsic_6: I need to know statistics so that I appear intelligent to my peers.
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the extrinsic motivators for needing to know statistics. The motivators are due to others wanting them to learn statistics (to appear smart, family) not school.
+
+**New Factor 5 (Attainment Value)**
+
+Variables in our Factor:
+
+* Attain_6: Doing well in statistics is important to my sense of self.
+* Attain_5: If I did poorly in a statistics course, I would be disappointed in myself.
+* Attain_7: If I am unable to interpret statistical results, I feel insecure.
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the attainment value or how well an individual wants to do well in statistics. The questions are generally to avoid feeling bad/disappointed.
+
+### Group 2
+
+I will list the questions for each new construct and give some idea of how/why these questions are loading together.
+
+**New Factor 1 (Difficulty)**
+
+Variables in our Factor:
+
+* (-) Difficult_7: Learning statistics for the first time is hard.
+* (-) Difficult_1: You must work hard to understand statistics.
+* (-) StatSC_4: I have trouble understanding statistics.
+* (-) Difficult_6: It is challenging to solve a problem that requires using statistics.
+* Difficult_3: Statistics is easy.
+* (-) StatSC_8: I often need guidance to understand statistics.
+* (-) StatSC_7: When I see a statistics question, I am unsure of how to begin.
+* (-) Expectancy_6: I find it challenging to decide which statistical method to use in a given context.
+* (-) Expectancy_1: I struggle to interpret statistical results.
+* (-) Cost_5: Taking statistics will limit my future prospects (for example, lower my GPA).
+* StatSC_2: I am good at statistics.
+* (-) Cost_7: I avoid working on statistics because it makes me feel bad.
+* (-) StatSC_5: I lack the skills to do well in statistics.
+* Difficult_2: Interpreting statistical results is straightforward. ***newly added with spring***
+
+*Negatively worded items load positively due to the amount of negative items and their loading magnitudes.*
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the difficulty of statistics. This is captured mainly through negatively worded items.
+
+**New Factor 2 (Expectancy/Self-Efficacy)*
+
+Variables in our Factor:
+
+
+* Expectancy_2: I am able to make decisions that require statistical thinking.
+* Expectancy_4: I can interpret graphs when I see them
+* Expectancy_5: I can identify when statistics is misused.
+* Expectancy_8: I am able to determine if data support a given hypothesis.
+* Expectancy_3: I can complete tasks that require basic statistical skills.
+* StatSC_1: I am able to explain statistical results to others.
+* Expectancy_7: I can use statistics to make informed decisions about my life.
+* AcadSC_2: I am good at statistics.
+* Expectancy_10: I can determine if a study is an experiment or observational.
+* StatSC_6: I have the academic background to do well in statistics.
+* Expectancy_9: I am able to describe the variability for a given data set.
+* StatSC_3: If I keep working at it, I know I can solve most statistics problems.
+* Difficult_5: Anybody can do statistics.
+* AcadSC_4: I enjoy intellectual challenges. ***no longer here with no spring data***
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to expectancy/self-efficacy. The items are all positively worded.
+
+**New Factor 3 (Personal Costs/Benefits)**
+
+Variables for our Factor:
+
+* (-) Cost_4: I have more important things to do than spending time learning statistics.
+* Cost_1: Learning statistics is a good use of my time.
+* Cost_6: Learning statistics is worth spending money on.
+* (-) Attain_2: If I could choose, I would never do statistics in the future.
+* (-) Cost_3: I prioritize other tasks over statistics.
+* Cost_2: Acquiring statistical skills is worth the effort.
+* (-) Attain_3: I do not care if I understand statistics.
+* Attain_4: Understanding statistics empowers me.
+* (-) Attain_1: I would only learn statistics if it helped me achieve my goals.
+
+*Negatively worded items load positively due to the amount of negative items and their loading magnitudes.*
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to the cost/attainment value of statistics (personal costs/benefits). Items are predominantly negative, but have a mix of the two.
+
+**New Factor 4 (Academic Perseverance)**
+
+Variables for our Factor
+
+* (-) AcadSC_9: When I fail at something, I immediately give up.
+* (-) AcadSC_7: When learning becomes difficult, I usually give up.
+* (-) AcadSC_5: I avoid working on things that are intimidating to me.
+* (-) StatSC_9: When statistics becomes challenging, I stop trying.
+* AcadSC_3: If I can't solve a problem right away, I will try again.
+
+*Negatively worded items load positively due to the amount of negative items and their loading magnitudes.*
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to persistence in a general term. Most questions are regarding general persistence, with one regarding statistical persistence.
+
+**New Factor 5 (Attainment Value)**
+
+Variables for our Factor:
+
+* Attain_5: If I did poorly in a statistics course, I would be disappointed in myself.
+* AcadSC_1: Doing well in school is important to me.
+* Attain_6: Doing well in statistics is important to my sense of self.
+* Attain_7: If I am unable to interpret statistical results, I feel insecure.
+
+**Potential New Definition:**
+
+This factor seems to be pertaining to attainment value in regards to an individual wanting to do well for themselves. These items differ from the other attainment items as these are positively worded.
+
+## Negatively and Positively Worded Items
+
+Negatively and positively worded items have the potential to add another layer of complexity in measurement development. These negative and positive items can potentially cluster together due to the framing of the question rather than the underlying factor trying to be measured. It is important to look at potential patterns with these items to ensure our measurement tool measures what we intend it to.
+
+Below contains summaries regarding these items.
+
+### Group 1
+
+**Key Point For Each New Factor:**
+
+* The new **Usefulness (personal/societal) factor** loaded all positively worded items.
+
+* The new **Interest/ENjoyment factor** had negatively worded items for its strongest loadings - so much so that their loadings became positive. The factor did contain about half positive loadings, but the strongest were negative.
+
+* The new **Usefulness (future/career)** had a few negatively worded items, but mostly positively worded items.
+
+* The new **Extrinsic Motivation factor** contained all positively worded items.
+
+* The new **Attainment Value factor** contained all positively worded items.
+
+### Group 2
+
+**Key Point For Each New Factor:**
+
+* The new **Difficulty factor** contained predominantly negatively worded items with few positively worded items. The negative item loadings are so extreme they load positively.
+
+* The new **Expectancy/Self-Efficacy factor** contained all positively worded items.
+
+* The new **Personal Costs/Benefits factor** contains a mix of positively and negatively worded items, but more negatively worded items. The negative items load so significantly they load positively.
+
+* The new **Academic Persistence factor** contained predominantly negatively worded items, so much so they loaded positively. 
+
+* The new **Attainment (wanting to do well) factor** contained all positively worded items.
+
+### Groups 1 and 2
+
+The attainment construct in both groups split, with one factor containing the negative items and another containing the positive items. The negative items split clearly into another related factor and the positive items stayed in their own separate factor (although, it is the most insignificant factor).
+
+## What Happened With Our Theorized Constructs?
+
+Let us discuss our theorized constructs for each group and how this new analysis may have changed how our constructs are looking now.
+
+### Group 1
+
+**How Each Construct Turned Out:**
+
+* The **Belief construct** had split its loadings - half on one factor (societal/personal usefulness) and half too insignificant to be shown in the output (except one, which loads onto a separate factor (interest)).
+
+* The **Intrinsic construct** split - half of the loadings onto one factor (societal/personal usefulness) and half split among a factor (interest) and another factor (career/future useufulness).
+
+* The **Extrinsic construct** also split - with a little over half loadings on one factor (careeer/future usefulness) and the others loadings onto another factor (extrinsic). The factor (extrinsic) has only extrinsic loadings on it. There are also some cross loadings onto multiple factors.
+
+* The **Utility construct** split onto two different factors - a little over half on one factor (societal/personal usefulness) and the rest on another (career/future usefulness).
+
+* The **Attain construct** split onto two different factors as well - one factor (interest) and another factor (attainment value). The new factor (attainment) has only significant loadings from the attainment construct, and the questions have to due with wanting to personally do well. This construct also had a few of its variable too insignificant to be shown in the output.
+
+* The **Interest construct** held up entirely (all questions loaded on the same factor (interest)).
+
+**Key Points Regarding Our Theorized Constructs For Group 1:**
+
+* The Interest construct held up, but all the other constructs split (usually onto two different factors, except in one instance).
+
+* The new attainment and extrinsic factors only have loadings from their respective hypothesized constructs.
+
+* Most factors contained items from multiple constructs, indicating theorized constructs may now have held.
+
+* The last two factors are only obtaining a few loadings, so we may want to remove one factor in the end.
+
+### Group 2
+
+**How Each Construct Turned Out:**
+
+* The **Academic Self Concept construct** split its loadings - half on one factor (presistence) and half split among other another factor (expectancy/self-efficacy) and a factor (attainment value). The persistence factor consisted of mainly AcadSC loadings with a single StatSC loading. Some loadings were too insignificant to print.
+
+* The **Attain construct** split its loadings between two different factors. One factor (attainment/cost) seems to pertain to the personal benefits of statistics, while the other factor (attainment) seems to pertain to wanting to do well personally.
+
+* The **Statistics Self Concept construct** split its loadings onto two factors - one factor (difficulty) and another factor (expectancy). One value loadings onto a third factor (persistence). 
+
+* The **Difficulty construct** loaded half of its variables onto one factor (difficulty), with one item loading on another factor (expectancy/self-efficacy) or being too insignificant to print.
+
+* The **Expectancy construct** loaded most of its items onto one factor (expectancy/self-efficacy), with only 2 out of 11 items loadings on a other factor (difficult) and one loading being too insignificant to load.
+
+* The **Cost construct** loaded most of its items (5 out of 7) on one factor (cost/attainment), with the remaining items loading on another factor (difficulty).
+
+**Key Points Regarding Our Theorized Constructs For Group 2:**
+
+* Two theorized constructs (Expectancy and Cost) held up fairly well, but not all items loaded on the same factor for any item.
+
+* Many items split onto two different factors or had a few items too insignificant to load.
+
+* The fourth and fifth factor are not containing many significant loadings, showing that we may only need four factors.
+
+### Groups 1 & 2
+
+**Key Points Regarding Similarities in Our Theorized Constructs For Group 1 and Group 2:**
+
+* Group 1 and Group 2 both had the construct Attain, which was seen to had half of its significant loadings load onto that final fifth factor in both groups. These loadings alone are holding up this factor and causing us to extract it in parallel analysis. Attain in group 1 is shown to have far fewer significant loadings, but a similar pattern.
+
+* Both constructs followed a similar pattern with constructs often splitting onto two different factors, with the rare occasion of some loading all on one factor or splitting half with multiple factors.
+
+* The fifth factor is not very significant and is being held up largely by the three items in Attain loading onto factor 5 for both groups.
+
+

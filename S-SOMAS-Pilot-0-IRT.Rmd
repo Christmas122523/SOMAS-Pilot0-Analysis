@@ -1,0 +1,397 @@
+---
+title: "S-SOMAS Pilot-0 IRT"
+author: "Douglas Whitaker"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: html_document
+---
+
+## CFA
+
+This draws on Matt's code for reading the data and the like. 
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+
+```
+
+```{r setup, include=FALSE}
+## Loading packages that are needed for the following code
+
+#rm(list = ls(all.names = TRUE)) ### Used to test if code works from beginning without having to knit
+
+library("readxl") # read_excel
+library("dplyr") # mutate
+library("matrixStats") # rowVars
+library("psych") # skew, kurtosi
+library("lavaan") # cfa
+library("semPlot") 
+library("corrplot")
+library("eRm")
+library("semTools")
+library("ltm")
+library("kableExtra")
+library("MPsychoR")
+library("mirt")
+library("Gifi")
+library("RColorBrewer")
+library("unimirt")
+
+# library(GPArotation)
+# library(nFactors)
+# library(ggplot2)
+# library(tidyverse)
+# library(kableExtra)
+# library(magrittr)
+# library(moments)
+# library(reshape)
+# library(resemble)
+# library(likert)
+# library(broom)
+# library(grid)
+# library(patchwork)
+# library(kableExtra)
+# library(networkD3)
+
+```
+
+# Reading in the Data
+
+We read in the datasets created using the `pilot0_data_cleaning.Rmd` file. 
+
+```{r readdata}
+group1 <- read.csv(file = "data/confidential/group1rc.csv")
+group2 <- read.csv(file = "data/confidential/group2rc.csv")
+
+```
+
+
+We now drop the "nrc" columns because we won't use them.
+
+```{r dropnrc}
+group1 <- group1[,!grepl("nrc", names(group1))]
+group2 <- group2[,!grepl("nrc", names(group2))]
+```
+
+# Item Response Theory Analysis
+
+This section will start by closely following Mair (2018) Chapter 4.
+
+## Dimensionality
+
+```{r princaller_res1}
+if (packageVersion("MASDERtools") < "0.0.5.1"){
+  stop("Update MASDERtools before continuing.")
+}
+scale_names_group1 <- unique(gsub(pattern = "\\_(.*)", x = names(group1), replacement = "", perl = TRUE))
+g1_pc_out <- MASDERtools::princaller(dat = group1, scale.names = scale_names_group1, method = "linear")
+print(g1_pc_out)
+scale_names_group2 <- unique(gsub(pattern = "\\_(.*)", x = names(group2), replacement = "", perl = TRUE))
+g2_pc_out <- MASDERtools::princaller(dat = group2, scale.names = scale_names_group2, method = "linear")
+print(g2_pc_out)
+```
+
+The following items should be dropped based on the results:
+
+* Group 1
+    * Belief: two groups
+        * 2rc, 4rc, 5rc, 10rc
+        * 1, 3rc, 6, 7, 8, 9
+    * Intrinsic: three groups
+        * 3, 5, 7
+        * 4
+        * 1, 2, 6
+    * Extrinsic: three groups
+        * 6, 7, 8
+        * 1, 4, 5
+        * 2, 3
+    * Utility: three groups
+        * 1, 3rc, 5rc, 8rc
+        * 2, 4, 6, 7
+    * Attain: perhaps three groups
+        * 1, 2, 3
+        * 4
+        * 5, 6, 7
+    * Interest: two groups
+        * 2, 4, 6, 9
+        * 1rc, 3rc, 5, 7rc, 8rc
+* Group 2
+    * AcadSC: two groups
+        * 1, 2, 3, 4, 6
+        * 5rc, 7rc, 8rc, 9rc
+    * Attain: perhaps three groups
+        * 1, 2, 3
+        * 4
+        * 5, 6, 7
+    * StatSC: one group
+    * Difficulty: perhaps two groups
+        * 1rc, 2, 3, 6rc, 7rc
+        * 4rc, 5
+    * Expectancy: two groups
+        * 1rc, 6rc, 11rc
+        * 2, 3, 4, 5, 7, 8, 9, 10
+    * Cost: three groups
+        * 5
+        * 7rc
+        * 1, 2, 3rc, 4rc, 6    
+        
+        
+```{r compare_IRT}
+comparer_out_g1 <- MASDERtools::comparer(dat = group1, scale.names = scale_names_group1)
+comparer_out_g2 <- MASDERtools::comparer(dat = group2, scale.names = scale_names_group2)
+``` 
+
+
+```{r grmer1, include=FALSE}
+grmit_g1_out1 <- MASDERtools::grmit(dat = group1, scale.names = scale_names_group1)
+itemfit1_out1 <- MASDERtools::itemfitbuilder(grmit_g1_out1)
+grmit_g2_out1 <- MASDERtools::grmit(dat = group2, scale.names = scale_names_group2)
+itemfit2_out1 <- MASDERtools::itemfitbuilder(grmit_g2_out1)
+```
+
+```{r}
+itemfit1_out1 %>% 
+  kbl() %>%
+  kable_paper("hover", full_width = FALSE) %>% 
+  column_spec(2:3, color = "white", background = ifelse(abs(itemfit1_out1$z.outfit) > 2, "red", "blue")) %>%
+  column_spec(4:5, color = "white", background = ifelse(abs(itemfit1_out1$z.infit) > 2, "red", "blue")) 
+
+itemfit2_out1 %>% 
+  kbl() %>%
+  kable_paper("hover", full_width = FALSE) %>% 
+  column_spec(2:3, color = "white", background = ifelse(abs(itemfit2_out1$z.outfit) > 2, "red", "blue")) %>%
+  column_spec(4:5, color = "white", background = ifelse(abs(itemfit2_out1$z.infit) > 2, "red", "blue")) 
+
+
+```
+
+```{r grmer2, include=FALSE}
+grmit_g1_out2 <- MASDERtools::grmit(dat = group1, scale.names = scale_names_group1,
+                                    drop.items=list(c(2,4,5,10), # Belief
+                                            NULL, # Intrinsic
+                                            c(2,3), # Extrinsic
+                                            c(2,4,6,7), # Utility
+                                            c(1,2,3), # Attain
+                                            NULL)) # Interest)
+itemfit1_out2 <- MASDERtools::itemfitbuilder(grmit_g1_out2)
+grmit_g2_out2 <- MASDERtools::grmit(dat = group2, scale.names = scale_names_group2,
+                                    drop.items=list(NULL, # AcadSC
+                                            c(1,2), # Attain
+                                            NULL, # StatSC
+                                            c(4,5), # Difficult
+                                            c(1,6,11), # Expectancy
+                                            c(5,7))) # Cost)
+itemfit2_out2 <- MASDERtools::itemfitbuilder(grmit_g2_out2)
+```
+
+```{r grmer3, include=FALSE}
+grmit_g1_out3 <- MASDERtools::grmit(dat = group1, scale.names = scale_names_group1[c(1,4,5)],
+                                    drop.items=list(c(1,3,6,7,8,9), # Belief
+                                                    c(1,3,5,8), # Utility
+                                                    c(5,6,7))) # Attain)
+itemfit1_out3 <- MASDERtools::itemfitbuilder(grmit_g1_out3)
+
+```
+
+```{r}
+itemfit1_out2 %>% 
+  kbl() %>%
+  kable_paper("hover", full_width = FALSE) %>% 
+  column_spec(2:3, color = "white", background = ifelse(abs(itemfit1_out2$z.outfit) > 2, "red", "blue")) %>%
+  column_spec(4:5, color = "white", background = ifelse(abs(itemfit1_out2$z.infit) > 2, "red", "blue")) 
+
+itemfit2_out2 %>% 
+  kbl() %>%
+  kable_paper("hover", full_width = FALSE) %>% 
+  column_spec(2:3, color = "white", background = ifelse(abs(itemfit2_out2$z.outfit) > 2, "red", "blue")) %>%
+  column_spec(4:5, color = "white", background = ifelse(abs(itemfit2_out2$z.infit) > 2, "red", "blue")) 
+
+itemfit1_out3 %>% 
+  kbl() %>%
+  kable_paper("hover", full_width = FALSE) %>% 
+  column_spec(2:3, color = "white", background = ifelse(abs(itemfit1_out3$z.outfit) > 2, "red", "blue")) %>%
+  column_spec(4:5, color = "white", background = ifelse(abs(itemfit1_out3$z.infit) > 2, "red", "blue")) 
+
+```
+
+Now we plot tracelines. 
+
+```{r item_graphs, fig.show = "hold", out.width = "33%"}
+MASDERtools::itemplotter(grmit_g1_out1)
+MASDERtools::itemplotter(grmit_g1_out2)
+MASDERtools::itemplotter(grmit_g1_out3)
+MASDERtools::itemplotter(grmit_g1_out2)
+
+```
+
+Now we construct Wright Maps for Group 1.
+
+```{r Wright_g1}
+
+for (i in 1:length(scale_names_group1)){
+  tmp_item_symbols <- matrix(rep(49:54, 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g1_out2[[i]]$mirt.out))),
+                              byrow = TRUE, 
+                                ncol = (ncol(unimirt::ThurstonianThresh(
+                               grmit_g1_out2[[i]]$mirt.out)))-1)
+  tmp_item_colours <- matrix(rep(brewer.pal(6, "Dark2"), 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g1_out2[[i]]$mirt.out))),
+                             byrow = TRUE, 
+                             ncol = (ncol(unimirt::ThurstonianThresh(
+                              grmit_g1_out2[[i]]$mirt.out)))-1)
+  tmp_thresh <- unimirt::ThurstonianThresh(grmit_g1_out2[[i]]$mirt.out)
+  WrightMap::wrightMap(thetas = grmit_g1_out2[[i]]$personscores,
+                       thresholds = tmp_thresh[,-1],
+                       main.title = paste("Wright Map with Thurstonian Thresholds for ", scale_names_group1[i], sep = ""),
+                       label.items = tmp_thresh[,1],
+                       show.thr.lab = FALSE,
+                       thr.sym.pch = tmp_item_symbols,
+                       thr.sym.cex = 1.5,
+                       thr.sym.col.fg = tmp_item_colours)
+                       #dim.color = RColorBrewer::brewer.pal(8, "Set1")[i])
+}
+```
+
+Now we drop Belief 2, 4, 5, and 10.
+
+```{r Wright_g1b}
+
+grmit_g1_out2_dropB2 <- MASDERtools::grmit(dat = group1, 
+                                           scale.names = scale_names_group1[1],
+                                           drop.items = list(c(2,4,5,10)))
+
+
+for (i in 1:length(scale_names_group1[1])){
+  tmp_item_symbols <- matrix(rep(49:54, 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g1_out2_dropB2[[i]]$mirt.out))),
+                              byrow = TRUE, 
+                                ncol = (ncol(unimirt::ThurstonianThresh(
+                               grmit_g1_out2_dropB2[[i]]$mirt.out)))-1)
+  tmp_item_colours <- matrix(rep(brewer.pal(6, "Dark2"), 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g1_out2_dropB2[[i]]$mirt.out))),
+                             byrow = TRUE, 
+                             ncol = (ncol(unimirt::ThurstonianThresh(
+                              grmit_g1_out2_dropB2[[i]]$mirt.out)))-1)
+  tmp_thresh <- unimirt::ThurstonianThresh(grmit_g1_out2_dropB2[[i]]$mirt.out)
+  WrightMap::wrightMap(thetas = grmit_g1_out2_dropB2[[i]]$personscores,
+                       thresholds = tmp_thresh[,-1],
+                       main.title = paste("Wright Map with Thurstonian Thresholds for ", scale_names_group1[i], sep = ""),
+                       label.items = tmp_thresh[,1],
+                       show.thr.lab = FALSE,
+                       thr.sym.pch = tmp_item_symbols,
+                       thr.sym.cex = 1.5,
+                       thr.sym.col.fg = tmp_item_colours)
+                       #dim.color = RColorBrewer::brewer.pal(8, "Set1")[i])
+}
+```
+
+Group 2 Wright Maps.
+
+```{r Wright_g2}
+
+for (i in 1:length(scale_names_group2)){
+  tmp_item_symbols <- matrix(rep(49:54, 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g2_out2[[i]]$mirt.out))),
+                              byrow = TRUE, 
+                                ncol = (ncol(unimirt::ThurstonianThresh(
+                               grmit_g2_out2[[i]]$mirt.out)))-1)
+  tmp_item_colours <- matrix(rep(brewer.pal(6, "Dark2"), 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g2_out2[[i]]$mirt.out))),
+                             byrow = TRUE, 
+                             ncol = (ncol(unimirt::ThurstonianThresh(
+                              grmit_g2_out2[[i]]$mirt.out)))-1)
+  tmp_thresh <- unimirt::ThurstonianThresh(grmit_g2_out2[[i]]$mirt.out)
+  WrightMap::wrightMap(thetas = grmit_g2_out2[[i]]$personscores,
+                       thresholds = tmp_thresh[,-1],
+                       main.title = paste("Wright Map with Thurstonian Thresholds for ", scale_names_group2[i], sep = ""),
+                       label.items = tmp_thresh[,1],
+                       show.thr.lab = FALSE,
+                       thr.sym.pch = tmp_item_symbols,
+                       thr.sym.cex = 1.5,
+                       thr.sym.col.fg = tmp_item_colours)
+                       #dim.color = RColorBrewer::brewer.pal(8, "Set1")[i])
+}
+```
+
+Now we drop Attain_7.
+
+```{r Wright_g2b}
+
+grmit_g2_out2_dropA7 <- MASDERtools::grmit(dat = group2, 
+                                           scale.names = scale_names_group2[2],
+                                           drop.items = list(7))
+
+
+for (i in 1){
+  tmp_item_symbols <- matrix(rep(49:54, 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g2_out2_dropA7[[i]]$mirt.out))),
+                              byrow = TRUE, 
+                                ncol = (ncol(unimirt::ThurstonianThresh(
+                               grmit_g2_out2_dropA7[[i]]$mirt.out)))-1)
+  tmp_item_colours <- matrix(rep(brewer.pal(6, "Dark2"), 
+                               times = nrow(unimirt::ThurstonianThresh(
+                                 grmit_g2_out2_dropA7[[i]]$mirt.out))),
+                             byrow = TRUE, 
+                             ncol = (ncol(unimirt::ThurstonianThresh(
+                              grmit_g2_out2_dropA7[[i]]$mirt.out)))-1)
+  tmp_thresh <- unimirt::ThurstonianThresh(grmit_g2_out2_dropA7[[i]]$mirt.out)
+  WrightMap::wrightMap(thetas = grmit_g2_out2_dropA7[[i]]$personscores,
+                       thresholds = tmp_thresh[,-1],
+                       main.title = paste("Wright Map with Thurstonian Thresholds for ", scale_names_group2[2], sep = ""),
+                       label.items = tmp_thresh[,1],
+                       show.thr.lab = FALSE,
+                       thr.sym.pch = tmp_item_symbols,
+                       thr.sym.cex = 1.5,
+                       thr.sym.col.fg = tmp_item_colours)
+                       #dim.color = RColorBrewer::brewer.pal(8, "Set1")[i])
+}
+```
+
+Now we print tables of the Thurstonian Thresholds for the full IRT (without dropping any items).
+
+```{r thurstone_tables}
+thursty_g1 <- NULL
+for (i in 1:length(scale_names_group1)){
+  thursty_g1 <- rbind(thursty_g1, unimirt::ThurstonianThresh(grmit_g1_out2[[i]]$mirt.out))
+}
+
+thursty_g2 <- NULL
+for (i in 1:length(scale_names_group2)){
+  thursty_g2 <- rbind(thursty_g2, unimirt::ThurstonianThresh(grmit_g2_out2[[i]]$mirt.out))
+}
+
+print(thursty_g1)
+print(thursty_g2)
+
+write.csv(thursty_g1, file = "out/thursty-g1.csv")
+write.csv(thursty_g2, file = "out/thursty-g2.csv")
+```
+
+Now we print the coefficients.
+
+```{r coef_tables}
+coefs_g1 <- NULL
+for (i in 1:length(scale_names_group1)){
+  tmp <- matrix(unlist(coef(grmit_g1_out2[[i]]$mirt.out))[1:(length(unlist(coef(grmit_g1_out2[[i]]$mirt.out)))-2)],ncol=7, byrow=TRUE)
+  rownames(tmp) <- names(coef(grmit_g1_out2[[i]]$mirt.out))[-length(names(coef(grmit_g1_out2[[i]]$mirt.out)))]
+  coefs_g1 <- rbind(coefs_g1, tmp)
+}
+coefs_g2 <- NULL
+for (i in 1:length(scale_names_group1)){
+  tmp <- matrix(unlist(coef(grmit_g2_out2[[i]]$mirt.out))[1:(length(unlist(coef(grmit_g2_out2[[i]]$mirt.out)))-2)],ncol=7, byrow=TRUE)
+  rownames(tmp) <- names(coef(grmit_g2_out2[[i]]$mirt.out))[-length(names(coef(grmit_g2_out2[[i]]$mirt.out)))]
+  coefs_g2 <- rbind(coefs_g2, tmp)
+}
+colnames(coefs_g1) <- colnames(coefs_g2) <- colnames(coef(grmit_g2_out2[[i]]$mirt.out)[[1]])
+print(coefs_g1)
+print(coefs_g2)
+write.csv(coefs_g1, file = "out/grm-coefs-g1.csv")
+write.csv(coefs_g2, file = "out/grm-coefs-g2.csv")
+```

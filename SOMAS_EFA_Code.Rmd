@@ -1,0 +1,588 @@
+---
+title: "Final S-SOMAS Analysis"
+author: "Matt Dunham"
+date: "6/30/2020"
+output: 
+  html_document:
+    number_sections: true
+---
+
+# What Does Our Data Consist Of?
+
+Our data consists of responses from college students enrolling in introductory Statistics classes. The data is on a 7-point likert scale. The students were randomly assigned to take either survey one or survey two, which both consisted of 49 to 50 items. The students were randomly split into two groups due to the length of the survey. The data files range from Fall 2017 to Fall 2019.
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r setup, include=FALSE}
+## Loading packages that are needed for the following code
+
+#rm(list = ls(all.names = TRUE)) ### Used to test if code works from beginning without having to knit
+#update.packages(ask = FALSE, checkBuilt = TRUE)
+library(GPArotation)
+library(nFactors)
+library(psych)
+library(Rcpp)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(kableExtra)
+library(magrittr)
+library(RColorBrewer)
+library(readxl)
+library(moments)
+library(reshape)
+library(resemble)
+library(likert)
+library(broom)
+library(grid)
+library(patchwork)
+library(kableExtra)
+library(matrixStats)
+library(networkD3)
+library(htmlwidgets)
+```
+
+```{r}
+
+### Reading in excel files created from the 'pilot0_data_cleaning' RMD. For this analysis, we only need group 1 and 2 original and reverse coded data. The original is used for factor loadings and the reverse coded is used for some visualizations of the new factors
+
+group1 <- read.csv("data/confidential/pilot0_group1.csv") 
+
+group2 <- read.csv("data/confidential/pilot0_group2.csv") 
+
+group1.rc <- read.csv("data/confidential/group1rc.csv")
+
+group2.rc <- read.csv("data/confidential/group2rc.csv") 
+```
+
+# Factor Analysis
+
+For Factor Analysis, we first need to determine the appropriate number of factor to use. In order to accomplish this, let us perform Parallel Analysis.
+
+## Parallel Analysis
+
+For the first part of Parallel Analysis, we will obtain eigenvalues from our data. Eigenvalues can show us the appropriate number of factors we have in our data, and Exploratory Factor Analysis can show us which questions are loading onto which factors.
+
+```{r}
+
+### We now will generate a numeric matrix of the data for each group. We must have a numeric matrix when calculating eigenvalues, but NOT when running the EFA. Eigenvalues can show us the appropriate number of factors, EFA will load the questions onto the factors (two seperate analyses).
+
+group1.matrix <- apply(as.matrix(group1), 2, as.numeric) %>% ### Group 1 numeric matrix
+  cor(na.omit(.)) ### Generating correlations between each variable as these are used in the generation of eigen values.
+
+group2.matrix <- apply(as.matrix(group2), 2, as.numeric) %>% ### Group 2 numeric matrix
+  cor(na.omit(.))
+
+
+### Calculating the eigen values for each group. These values will be used for our parallel analysis and scree plot generation
+
+group1.eigen <- eigen(group1.matrix)$values ### Group 1 eigen values
+
+group2.eigen <- eigen(group2.matrix)$values ### Group 2 eigen values
+```
+
+## Scree Plots
+
+Now that we have obtained our eigen values for group 1 and group 2, we can move forward with the rest of parallel analysis and scree plot generation. 
+
+Scree plot generation can help us visualize our eigen values and determine the number of factors we have in our data. When generating these scree plots, contrary to the eigenvalue generation, we will be using the raw data and not a numeric matrix. 
+
+In our generation of scree plots, there are a few arguments we can use. One of these arguments is the **cent** argument. In this argument, for group 1, we obtained a factor level of 4 or 5 depending on our cent level. Glorfeld 1995 & Hayton 2004 suggest a cent=.95, which is a more conservative approach. Parallel analysis tends to overestimate the number of factors, so we should consider using .95.
+
+### Group 1
+
+For group 1, we will be using cent=0.5, although it is important to keep in mind that we were obtaining 4 factors with cent=0.95. The purpose for using cent = 0.5 and not 0.95 as advised by Glorfeld and Hayton is because we can simply drop this last factor if we are seeing very small loadings (since this is exploratory research).
+
+```{r message=FALSE, warning=FALSE}
+
+### We now will conduct parallel analysis to determine to appropriate number of factors for each of our groups. Parallel analysis can be done in a variety of ways, and for our case we will be plotting our eigen values on a scree plot, as well as geneating a scree plot from the raw data (which will in itself use eigenvalues, but has potential for other data manipulation within the fuction)
+
+### Important note about our centile selection: Glorfeld 1995 & Hayton 2004 suggest a cent=.95, which is a more conservative approach. Parallel analysis tends to overestimate the number of factors, so we should consider using .95
+
+### Hayton suggest using both average and 0.95. When using cent .95, we obtain 4 factors, and for .05, we obtain 5. We should stick with 0.95 to be more conservative and not overestimate the amount of factors we may have.
+
+### We check this for both parallel and fa.parallel function and they yieled similar results when comparing the two. Sticking with .95 for both.
+
+
+##### Since scree plots deal with simulated data, when using cent=0.95, we are obtaining 4 or 5 factors (depedent on the simulation results). 
+
+
+### Parallel Analysis using cent=0.95
+group1.parallel1_1 <- parallel(subject=nrow(group1), var=ncol(group1.matrix), rep=100, cent=0.95) ### Performing the Parallel Analysis with 100 repetitions and a centile of .95 for a conservative estimate.
+
+##Alana's scree plot
+
+#Create data frame with observed and simulated eigenvalues
+obs <- data.frame(group1.eigen)
+#add columns for type, number
+obs$type = c('Observed Data') ### creating column called observed data
+obs$num = c(1:49) ### Putting the number of items in our data set as a column names num
+colnames(obs) = c('eigenvalue', 'type', 'num') ### Renaming column names to more relavent names
+
+sim <- data.frame(group1.parallel1_1$eigen$qevpea)### Extracting simulated eigen values for group 1
+sim$type <- c('Simulated Data') ### Adding simulated eigen values to the data frame 
+sim$num <- c(1:49) ### Adding a column for the number of variables we have
+colnames(sim) = c('eigenvalue', 'type', 'num') ### Renaming columns so they are more relavent and match names with the obs data.
+
+screevals <- rbind(obs, sim) ### Binding columns together
+
+##APA Theme. This is useful for publication sake.
+apatheme=theme_bw()+
+theme(panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(),
+panel.background = element_blank(),
+panel.border = element_blank(),
+text=element_text(family='Arial'),
+legend.title=element_blank(),
+legend.position=c(.7,.8),
+axis.line.x = element_line(color='black'),
+axis.line.y = element_line(color='black'))
+
+#Create the Plot
+#Use data from eigendat. Map number of factors to x-axis, eigenvalue to y-axis, and give different data point shapes depending on whether eigenvalue is observed or simulated
+p3 <- ggplot(screevals, aes(x=num, y=eigenvalue, shape=type)) +
+  #Add lines connecting data points
+geom_line(size=1)+
+  #Add the data points.
+geom_point(size=2.5)+
+  #Label the y-axis 'Eigenvalue'
+scale_y_continuous(name='Eigenvalue')+
+  #Label the x-axis 'Factor Number', and ensure that it ranges from 1-max # of factors,     increasing by one with each 'tick' mark.
+scale_x_continuous(name='Factor Number', limits=c(1, 49))+
+  #Manually specify the different shapes to use for actual and simulated data, in this case, white and black circles.
+scale_shape_manual(values=c(16,1)) +
+  #Add vertical line indicating parallel analysis suggested max # of factors to retain
+#geom_vline(xintercept = 2, linetype = 'dashed')+
+  #apa-formatting theme
+apatheme
+
+#Call the plot
+p3
+
+#ggsave('parallel_group1.png', width=4, height=2.5, unit='in', dpi=300) ### Saves the scree plot as a .png
+
+```
+
+From this scree plot, we are seeing that we should extract 5 factors from our data. We will keep this in mind when moving to EFA.
+
+### Group 2
+
+For group 2, we are obtaining the same number of factors regardless of our cent value. This can give us some level of confidence in this number, but this is still exploratory so we cannot say another for certain yet.
+
+```{r message=FALSE, warning=FALSE}
+### Parallel Analysis for Group 2 w/ same comments
+
+### Parallel Analysis using cent=0.95
+group2.parallel1_1 <- parallel(subject=nrow(group2), var=ncol(group2.matrix), rep=100, cent=0.95) ### Obtaining 5 factors with 0.95
+
+##Alana's Scree plot
+
+#Create data fram with observed and simulated eigenvalues
+obs2 <- data.frame(group2.eigen)
+#add columns for type, number
+obs2$type = c('Observed Data')
+obs2$num = c(1:50)
+colnames(obs2) = c('eigenvalue', 'type', 'num')
+
+
+sim2 <- data.frame(group2.parallel1_1$eigen$qevpea)
+sim2$type <- c('Simulated Data')
+sim2$num <- c(1:50)
+colnames(sim2) = c('eigenvalue', 'type', 'num')
+
+
+screevals2 <- rbind(obs2, sim2)
+
+
+##APA Theme
+apatheme=theme_bw()+
+theme(panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(),
+panel.background = element_blank(),
+panel.border = element_blank(),
+text=element_text(family='Arial'),
+legend.title=element_blank(),
+legend.position=c(.7,.8),
+axis.line.x = element_line(color='black'),
+axis.line.y = element_line(color='black'))
+
+#Create the Plot
+#Use data from eigendat. Map number of factors to x-axis, eigenvalue to y-axis, and give different data point shapes depending on whether eigenvalue is observed or simulated
+p4 <- ggplot(screevals2, aes(x=num, y=eigenvalue, shape=type)) +
+  #Add lines connecting data points
+geom_line(size=1)+
+  #Add the data points.
+geom_point(size=2.5)+
+  #Label the y-axis 'Eigenvalue'
+scale_y_continuous(name='Eigenvalue')+
+  #Label the x-axis 'Factor Number', and ensure that it ranges from 1-max # of factors,     increasing by one with each 'tick' mark.
+scale_x_continuous(name='Factor Number', limits=c(1, 50))+
+  #Manually specify the different shapes to use for actual and simulated data, in this case, white and black circles.
+scale_shape_manual(values=c(16,1)) +
+  #Add vertical line indicating parallel analysis suggested max # of factors to retain
+#geom_vline(xintercept = 2, linetype = 'dashed')+
+  #apa-formatting theme
+apatheme
+
+#Call the plot
+p4
+
+#ggsave('parallel_group2.png', width=4, height=2.5, unit='in', dpi=300)
+
+```
+
+For group 2, we obtained 5 potential factors with the scree plot, so we will move forward with EFA keeping in mind this number.
+
+We will now load our variables onto the amount of factors we obtained from Parallel Analysis.
+
+## Skew and Kurtosis
+
+Before we go ahead with EFA, we will check skew and kurtosis to see if we are horribly violating our normality assumptions. For similar preseasons why we visualized our data so indepthly, the normality violations of our data can determine possible limitations with EFA arguments.
+
+Violations follow these stipulations:
+
+* Skew < 3
+* Kurtosis < 10
+
+```{r}
+### Skew and kurtosis
+
+group1 <- as.data.frame(group1) ## for some reason the function is messed up unless you make sure to save the data as a data frame prior to finding them.
+group2 <- as.data.frame(group2)
+
+max(abs(psych::skew(group1)))
+max(abs(psych::kurtosi(group1)))
+max(abs(psych::skew(group2)))
+max(abs(psych::kurtosi(group2)))
+
+### All other kurtosis values are below 10
+```
+
+# Exploratory Factor Analysis
+
+After Parallel Analysis and determining our maximum skew and kurtosis values, we can move ahead with Exploratory Factor Analysis. EFA will be conducted on each group separately, using what we obtained from parallel analysis, skew and kurtosis generation and our summary statistics.
+
+There are a few functions you can use for EFA. We considered both the fa and factanal functions, but decided to go with the fa function in the end. The factanal function assumes normality (which we could go ahead with since skew and kurtosis are fine), but also limits the arguments we can use in the data. The fa function allows for a more specific EFA argumentation.
+
+Within the fa function, we are performing a promax rotation with a factoring method doing the principal factor solution. Along with this, we are using a polychoric correlation because we have data from a Likert scale, making our data ordinal and not continuous. This requires a polychoric correlation. 
+
+Using the fa function, we looked at two possible outcomes, one with a correction = 0 and one with a correction = 0.5. This correction determines how we should treat empty cells, but in the end did not change our loadings much at all. We went ahead with a correction = 0.
+
+These arguments and function selection are consistent across both the groups.
+
+## Sorting Method
+
+We also will be printing out two versions of the loadings for each group: one where the variables are ordered (designed to show how well constructs are holding up), and another where the loadings are ordered by magnitude and factor (where we can see what the new constructs are looking like). Visualizing these loadings in these two different ways can help us when it comes to interpreting our EFA results and making decisions about question wording and new hypothesized constructs.
+
+### Group 1
+
+For group 1, we will be conducting a 5 factor EFA. We are using 5 factors as this is what we obtained from our scree plot generation when looking at cent = 0.05. We may expect to see one factor will very few loadings since we obtained 4 factors when cent = 0.95. If this is the case, we can look at 4 factors in the future. 
+
+**5 Factors (sorted by variable name)**
+
+```{r}
+### We will run an EFA using the number of factors we obtained from parallel analysis. We obtained 5 factor from both parallel analysis methods, so no let us load our factor loadings onto the factors themselves.
+
+### We will cut off the factors at 0.4 as this is what we consider significant.
+
+### fa function will have two continuity correction to test.
+
+group1.fa5_2 <- fa(r = group1, nfactors = 5, rotate="promax", fm="pa", cor="poly", correct=0) ### correct = 0
+print(group1.fa5_2$loadings, cutoff=0.4) ### printing out results.
+```
+
+**5 Factors (sorted by loading magnitude)**
+
+```{r}
+group1.sorted <- unclass(fa.sort(group1.fa5_2)) ### Unclass to determine where the loadings are located and extract them
+
+group1.sorted <- group1.sorted$loadings ### Pulling our loadings
+
+print(group1.sorted, cutoff=0.4) ### Printing the sorted loadings with a cutoff of 0.4.
+```
+
+### Group 2
+
+For group 2, we clearly obtained 5 factors from our scree plots, so we will do a 5 factor EFA using the same arguments and function as group 1.
+
+**5 Factors (sorted by variable name)**
+
+```{r}
+### The original paper uses 5 factors, so we will test this and see if things are looking similar
+
+group2.fa5_2 <- fa(r = group2, nfactors = 5, n.obs=n2, rotate="promax", fm="pa", cor="poly", correct=0)
+print(group2.fa5_2$loadings, cutoff=0.4)
+```
+
+**5 Factors (sorted by loading magnitude)**
+
+```{r}
+group2.sorted <- unclass(fa.sort(group2.fa5_2)) ### Unclass to determine where the loadings are located and extract them
+
+group2.sorted <- group2.sorted$loadings ### Pulling our loadings
+
+print(group2.sorted, cutoff=0.4) ### Printing the sorted loadings with a cutoff of 0.4.
+
+```
+
+## Histograms of New Empirical Factors
+
+The Effort Scale in the SATS has an issue with being too skewed where students are overall believing they put a lot of effort into learning statistics, regardless of the outcome or change in knowledge. Visualizing these new empirical factors may show some issues that can be addressed in future edits.
+
+### Group 1
+
+Histograms of each empirical factor determined from Factor Analysis for Group 2.
+
+```{r message=FALSE, warning=FALSE}
+
+### Interest/Enjoyment Factor
+group1.fa1 <- group1.rc %>% ### Using recorded data for group 1
+  select(Interest_1rc, Interest_3rc, Interest_8rc, Interest_5, Attain_2rc, Belief_10rc, Interest_7rc, Interest_2, Intrinsic_1, Interest_4, Intrinsic_6, Interest_6, Attain_1rc, Attain_3rc) %>% ### Selecting the items in the new factor
+  mutate(means = rowMeans(.)) %>% ### Calculate mean scores for each row
+  select(means) ### Select only the means
+
+plot.group1.fa1 <- ggplot(group1.fa1, aes(means)) + ### plot the means in a histogram
+  geom_histogram(color="black", fill="grey",) + ### design
+  scale_x_continuous(name="Interest/Enjoyment", limits = c(0, 7)) ### x-axis scale
+
+
+### Code is similar for the following new factors
+group1.fa2 <- group1.rc %>%
+  select(Utility_6, Utility_4, Utility_7, Belief_9, Intrinsic_7, Belief_1, Belief_6, Intrinsic_3, Intrinsic_5, Belief_8, Belief_7, Belief_3rc, Intrinsic_4) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa2 <- ggplot(group1.fa2, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Value (personal/societal)", limits = c(0, 7))
+
+group1.fa3 <- group1.rc %>%
+  select(Extrinsic_5, Extrinsic_4, Utility_1, Extrinsic_2, Utility_8rc, Extrinsic_3, Extrinsic_1, Utility_2, Utility_3rc, Intrinsic_2) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa3 <- ggplot(group1.fa3, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Utility Value (career/future)", limits = c(0, 7))
+
+group1.fa4 <- group1.rc %>%
+  select(Extrinsic_8, Extrinsic_7, Extrinsic_6) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa4 <- ggplot(group1.fa4, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Extrinsic Motivation", limits = c(0, 7))
+
+group1.fa5 <- group1.rc %>%
+  select(Attain_5, Attain_6, Attain_7, Belief_10rc) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group1.fa5 <- ggplot(group1.fa5, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attainment Value", limits = c(0, 7))
+
+#plot.group1.fa1 
+#ggsave('g1fa1.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa2
+#ggsave('g1fa2.png', width=2.6, height=4, unit='in', dpi=300)
+#plot.group1.fa3
+#ggsave('g1fa3.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa4
+#ggsave('g1fa4.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group1.fa5
+#ggsave('g1fa5.png', width=2.5, height=4, unit='in', dpi=300)
+
+
+plot.group1.fa1  + plot.group1.fa2  + plot.group1.fa3  + plot.group1.fa4  + plot.group1.fa5
+```
+
+### Group 2
+
+Histograms of each empirical factor determined from Factor Analysis for Group 2.
+
+```{r message=FALSE, warning=FALSE}
+
+### AcadSC construct
+group2.fa1 <- group2.rc %>%
+  select(Difficult_7rc, Difficult_1rc, Difficult_3, StatSC_4rc, Difficult_6rc, StatSC_8rc, StatSC_7rc, Expectancy_6rc, Expectancy_1rc, StatSC_2, Cost_5rc, Difficult_2, Cost_7rc, StatSC_5rc) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa1 <- ggplot(group2.fa1, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Difficulty", limits = c(0, 7))
+
+group2.fa2 <- group2.rc %>%
+  select(Expectancy_4, Expectancy_2, Expectancy_5, Expectancy_3, Expectancy_10, Expectancy_8, StatSC_1, AcadSC_2, Expectancy_7, StatSC_6, StatSC_3, Expectancy_9, Expectancy_11rc) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa2 <- ggplot(group2.fa2, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Expectancy/Self-Efficacy", limits = c(0, 7))
+
+group2.fa3 <- group2.rc %>%
+  select(Cost_1, Cost_4rc, Cost_6, Attain_2rc, Cost_2, Cost_3rc, Attain_3rc, Attain_4, Attain_1rc) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa3 <- ggplot(group2.fa3, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Personal Costs/Benefits", limits = c(0, 7))
+
+group2.fa4 <- group2.rc %>%
+  select(AcadSC_9rc, AcadSC_7rc, AcadSC_5rc, StatSC_9rc, AcadSC_3) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa4 <- ggplot(group2.fa4, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Academic Perseverance", limits = c(0, 7))
+
+group2.fa5 <- group2.rc %>%
+  select(Attain_5, Attain_6, Attain_7, AcadSC_1) %>%
+  mutate(means = rowMeans(.)) %>%
+  select(means)
+
+plot.group2.fa5 <- ggplot(group2.fa5, aes(means)) +
+  geom_histogram(color="black", fill="grey",) +
+  scale_x_continuous(name="Attainment Value", limits = c(1, 7))
+
+#plot.group2.fa1 
+#ggsave('g2fa1.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa2
+#ggsave('g2fa2.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa3
+#ggsave('g2fa3.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa4
+#ggsave('g2fa4.png', width=2.5, height=4, unit='in', dpi=300)
+#plot.group2.fa5
+#ggsave('g2fa5.png', width=2.5, height=4, unit='in', dpi=300)
+
+plot.group2.fa1  + plot.group2.fa2  + plot.group2.fa3  + plot.group2.fa4  + plot.group2.fa5
+```
+
+## Tables of Means and Standard Deviations for each new Empirical Factor
+
+We will generate a table for each group of the mean and standard deviation for both groups.
+
+### Group 1
+
+```{r}
+
+group1.fa.means <- c(mean(data.matrix(group1.fa1)), mean(data.matrix(group1.fa2)), mean(data.matrix(group1.fa3)), mean(data.matrix(group1.fa4)), mean(data.matrix(group1.fa5))) %>% ### calculating the mean of each factor for group 1
+  round(3) %>% ### round values to 3
+  as.data.frame() ### save as a data frame
+
+### same for std. devs.
+group1.fa.sds <- c(sd(data.matrix(group1.fa1)), sd(data.matrix(group1.fa2)), sd(data.matrix(group1.fa3)), sd(data.matrix(group1.fa4)), sd(data.matrix(group1.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group1.fa.names <- c("Interest/Enjoyment", "Utility Value (personal/societal", "Utility Value (career/future)", "Extrinsic Motivation", "Attainment Value") %>%
+  as.data.frame() ### names of the factors for group 1
+
+group1.fa.table <- bind_cols(group1.fa.names, group1.fa.means, group1.fa.sds) ### bind data together to make a table.
+
+kable(group1.fa.table, col.names = c("Factor Name", "Mean", "Standard Deviation"), caption = "Means and Std. Devs. for Empirical Factors in Group 1") %>%
+  kable_styling(full_width = FALSE, position = "center") ### generating the table
+```
+
+### Group 2
+
+```{r}
+### same code for group 2
+group2.fa.means <- c(mean(data.matrix(group2.fa1)), mean(data.matrix(group2.fa2)), mean(data.matrix(group2.fa3)), mean(data.matrix(group2.fa4)), mean(data.matrix(group2.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group2.fa.sds <- c(sd(data.matrix(group2.fa1)), sd(data.matrix(group2.fa2)), sd(data.matrix(group2.fa3)), sd(data.matrix(group2.fa4)), sd(data.matrix(group2.fa5))) %>%
+  round(3) %>%
+  as.data.frame()
+
+group2.fa.names <- c("Difficulty", "Expectancy/Self-Efficacy", "Personal Costs/Benefits", "Academic Perseverace", "Attainment Value") %>%
+  as.data.frame()
+
+group2.fa.table <- bind_cols(group2.fa.names, group2.fa.means, group2.fa.sds)
+
+kable(group2.fa.table, col.names = c("Factor Name", "Mean", "Standard Deviation"), caption = "Means and Std. Devs. for Empirical Factors in Group 2") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+# Summaries and Future Implications
+
+We now will discuss some of the implications and findings from the results above, as well as take a visual representation of how the theoretical constructs now map onto the empirical factors.
+
+## Sankey Diagrams
+
+We will use a Sankey diagram to path each theoretical construct to their new empirical factors.
+
+### Group 1
+
+Sankey Diagram for Group 1.
+
+```{r}
+
+links <- data.frame(source=c("Beliefs and Sterotypes", "Beliefs and Sterotypes", "Intrinsic Motivation" , "Intrinsic Motivation", "Intrinsic Motivation", "Extrinsic Motivation", "Extrinsic Motivation", "Utility Value", "Utility Value", "Attainment Value", "Attainment Value", "Interest/Enjoyment" ),
+                    target=c("Interest/Enjoyment ", "Utility Value (personal/societal)", "Interest/Enjoyment ", "Utility Value (personal/societal)", "Utility Value (future/career)", "Utility Value (future/career)", "Extrinsic Motivation ", "Utility Value (personal/societal)", "Utility Value (future/career)", "Interest/Enjoyment ", "Attainment Value ", "Interest/Enjoyment "), 
+                    value=c(1, 6, 2, 4, 1, 5, 3, 3, 4, 3, 3, 9))
+
+### source are our theorized constructs
+### target is where the theorized construct now "goes" or where its items are loading now
+### vaule is the amount of questions that go from our theorized construct to new empirical factor
+
+nodes <- data.frame(name=c(as.character(links$source), as.character(links$target)) %>% unique()) ### creating node names
+
+links$IDsource <- match(links$source, nodes$name) - 1 ### necessary step so the graph actually prints
+links$IDtarget <- match(links$target, nodes$name) - 1 ### necessary step so the graph actually prints
+
+nodes$group <- as.factor(c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"))
+
+my_color1 <- 'd3.scaleOrdinal() .domain(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"]) .range(["#882255", "#D55E00", "#999933", "#117733", "#6699CC", "#999999", "#999999", "#44AA99", "#6699CC", "#44AA99", "#999933"])'
+
+p <- sankeyNetwork(Links = links, Nodes = nodes,
+              Source = "IDsource", Target = "IDtarget",
+              Value = "value", NodeID = "name", fontSize = 14, nodeWidth = 30, 
+              sinksRight=FALSE, colourScale=my_color1, NodeGroup = 'group') ### generating the sankey diagram with the designed format
+
+p ### print it
+
+saveWidget(p, file=paste0( getwd(), "/sankeyColor1.html"))
+```
+
+### Group 2
+
+Sankey Diagram for Group 2.
+
+```{r}
+### same code for group 2
+
+links2 <- data.frame(source=c("Academic Self Concept", "Academic Self Concept", "Academic Self Concept", "Attainment Value", "Attainment Value", "Statistics Self Concept", "Statistics Self Concept", "Statistics Self Concept", "Difficulty", "Expectancy Value", "Expectancy Value", "Expectancy Value", "Cost", "Cost"),
+                    target=c("Expectancy/Self-efficacy", "Academic Perseverance", "Attainment Value ", "Personal Costs/Benefits", "Attainment Value ", "Difficulty ", "Expectancy/Self-efficacy", "Academic Perseverance", "Difficulty ",  "Difficulty ", "Expectancy/Self-efficacy", "Personal Costs/Benefits", "Difficulty ", "Personal Costs/Benefits"), 
+                    value=c(1, 4, 1, 5, 3, 5, 3, 1, 5, 2, 9, 1, 2, 5))
+
+nodes2 <- data.frame(name=c(as.character(links2$source), as.character(links2$target)) %>% unique())
+
+links2$IDsource <- match(links2$source, nodes2$name) - 1
+links2$IDtarget <- match(links2$target, nodes2$name) - 1
+
+nodes2$group <- as.factor(c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"))
+
+my_color2 <- 'd3.scaleOrdinal() .domain(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"]) .range(["#117733", "#999999", "#D55E00", "#882255", "#6699CC", "#999933", "#88CCEE", "#44AA99", "#999999", "#DDCC77", "#882255"])'
+
+p2 <- sankeyNetwork(Links = links2, Nodes = nodes2,
+              Source = "IDsource", Target = "IDtarget",
+              Value = "value", NodeID = "name", fontSize = 14, nodeWidth = 30,
+              sinksRight=FALSE, colourScale=my_color2, NodeGroup = 'group')
+
+p2
+
+saveWidget(p2, file=paste0( getwd(), "/sankeyColor2.html"))
+```
